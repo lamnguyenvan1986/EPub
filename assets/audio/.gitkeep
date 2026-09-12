@@ -1,0 +1,3 @@
+# Audio Placeholders
+# Các file audio placeholder được tạo để test background audio
+# Trong production, thay thế bằng file audio thực tế hoặc API TTS

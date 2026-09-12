@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="default_web_client_id">YOUR_WEB_CLIENT_ID</string>
+    <string name="firebase_android_client_id">YOUR_ANDROID_CLIENT_ID</string>
+    <string name="firebase_ios_client_id">YOUR_IOS_CLIENT_ID</string>
+    <string name="gcm_defaultSenderId">YOUR_PROJECT_NUMBER</string>
+    <string name="google_api_key">YOUR_API_KEY</string>
+    <string name="google_crash_reporting_api_key">YOUR_API_KEY</string>
+    <string name="google_storage_bucket">libri-audio.appspot.com</string>
+    <string name="project_id">libri-audio</string>
+</resources>

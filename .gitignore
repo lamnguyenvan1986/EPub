@@ -1,0 +1,71 @@
+# Dependencies
+/.dart_tool/
+/.pub/
+/build/
+
+# Flutter
+Flutter.lock
+pubspec.lock
+.pub-version
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.pub-cache/
+.dart-tool/
+
+# Android
+android/.gradle/
+android/app/debug/
+android/app/release/
+android/keystore.jks
+
+# iOS
+ios/.symlinks/
+ios/Runner/GeneratedFiles/
+ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+ios/Runner.xcodeproj/xcuserdata/
+
+# Logs
+*.log
+
+# Cache
+*.cache
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Binaries
+*.aar
+*.jar
+*.zip
+
+# Temporary files
+*.tmp
+*.temp
+
+# Android Studio
+*.log
+*.iml
+
+# Test coverage
+coverage/
+
+# Firebase
+firebase-debug.log
+
+# Documentation (chỉ giữ lại README)
+# docs/ được giữ nguyên vì là tài liệu chính
+# Widget Preview related
+.widget_preview/

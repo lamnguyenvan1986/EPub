@@ -1,0 +1,363 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:libri_audio/services/drive_service.dart';
+import 'package:libri_audio/providers/book_provider.dart';
+import 'package:googleapis/drive/v3.dart' as drive;
+
+class FileImportScreen extends StatefulWidget {
+  const FileImportScreen({super.key});
+
+  @override
+  State<FileImportScreen> createState() => _FileImportScreenState();
+}
+
+class _FileImportScreenState extends State<FileImportScreen> {
+  late final DriveService _driveService;
+  bool _isConnecting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _driveService = DriveService();
+    _checkAuthentication();
+  }
+
+  Future<void> _checkAuthentication() async {
+    if (_driveService.isAuthenticated) {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Import Books'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: Navigator.of(context).pop,
+        ),
+        actions: [
+          if (!kIsWeb) ...[
+            Consumer<DriveService>(
+              builder: (context, driveService, child) {
+                if (driveService.isAuthenticated) {
+                  return TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GoogleDriveBooksScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('Google Drive'),
+                  );
+                }
+                return TextButton(
+                  onPressed: _isConnecting ? null : _handleGoogleSignIn,
+                  child: _isConnecting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Connect Google Drive'),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildImportMethodCard(
+                    icon: Icons.file_upload_outlined,
+                    title: 'Import from Device',
+                    description: 'Select books from your device storage',
+                    onPressed: _handleImportFromDevice,
+                  ),
+                  const SizedBox(height: 16),
+                  if (!kIsWeb) ...[
+                    _buildImportMethodCard(
+                      icon: Icons.cloud_upload_outlined,
+                      title: 'Import from Google Drive',
+                      description: 'Select books from your Google Drive',
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => GoogleDriveBooksScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ] else ...[
+                    _buildDisabledCard(
+                      icon: Icons.cloud_upload_outlined,
+                      title: 'Import from Google Drive',
+                      description: 'Google Drive import is not supported on web. Use device storage instead.',
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (_error != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(top: 16),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error, color: Colors.red.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: TextStyle(color: Colors.red.shade700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImportMethodCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required VoidCallback onPressed,
+  }) {
+    return Card(
+      child: ListTile(
+        leading: Icon(icon, size: 48),
+        title: Text(title),
+        subtitle: Text(description),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildDisabledCard({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Card(
+      child: ListTile(
+        leading: Icon(icon, size: 48, color: Colors.grey),
+        title: Text(title, style: const TextStyle(color: Colors.grey)),
+        subtitle: Text(description, style: const TextStyle(color: Colors.grey)),
+        trailing: const Icon(Icons.lock, size: 16, color: Colors.grey),
+        onTap: null,
+      ),
+    );
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    if (kIsWeb) {
+      setState(() {
+        _error = 'Google Sign-In is not supported on web. Use device storage instead.';
+      });
+      return;
+    }
+
+    setState(() => _isConnecting = true);
+
+    try {
+      final success = await _driveService.authenticate();
+      if (mounted) {
+        if (success) {
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Connected to Google Drive')),
+          );
+        } else {
+          setState(() {
+            _error = 'Failed to connect to Google Drive';
+            _isConnecting = false;
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isConnecting = false;
+      });
+    }
+  }
+
+  Future<void> _handleImportFromDevice() async {
+    // if (kIsWeb) {
+    //   // On web, show a message that file import is not fully supported
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(
+    //       content: Text(
+    //         'File import from device is not fully supported on web. '
+    //         'Please use a mobile device or desktop for file import.',
+    //       ),
+    //     ),
+    //   );
+    //   return;
+    // }
+
+    try {
+      final filePath = await _driveService.pickFileFromDevice();
+      if (filePath == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No file selected')),
+          );
+        }
+        return;
+      }
+
+      print('Importing file: $filePath');
+
+      await context.read<BookProvider>().importLocalFile(filePath);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Book imported successfully')),
+        );
+      }
+    } catch (e) {
+      print('Error importing file: $e');
+      setState(() {
+        _error = 'Error: ${e.toString()}';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _driveService.dispose();
+    super.dispose();
+  }
+}
+
+class GoogleDriveBooksScreen extends StatefulWidget {
+  const GoogleDriveBooksScreen({super.key});
+
+  @override
+  State<GoogleDriveBooksScreen> createState() => _GoogleDriveBooksScreenState();
+}
+
+class _GoogleDriveBooksScreenState extends State<GoogleDriveBooksScreen> {
+  Future<void> _downloadAndImportFile(BuildContext context, drive.File file) async {
+    try {
+      final driveService = context.read<DriveService>();
+      final filePath = await driveService.downloadFile(file);
+
+      if (filePath != null) {
+        await context.read<BookProvider>().importLocalFile(filePath);
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Book imported: ${file.name}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Google Drive'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: Navigator.of(context).pop,
+        ),
+      ),
+      body: Consumer<DriveService>(
+        builder: (context, driveService, child) {
+          if (!driveService.isAuthenticated) {
+            return const Center(child: Text('Please connect Google Drive first.'));
+          }
+
+          return FutureBuilder<List<drive.File>>(
+            future: driveService.driveApi != null ? driveService.listPdfAndEpubFiles() : Future.value([]),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error, size: 48, color: Colors.red),
+                      const SizedBox(height: 8),
+                      Text(snapshot.error.toString()),
+                    ],
+                  ),
+                );
+              }
+
+              final files = snapshot.data ?? [];
+
+              if (files.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.folder_open, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text('No PDF or EPUB files found in Google Drive'),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: files.length,
+                itemBuilder: (context, index) {
+                  final file = files[index];
+                  return Card(
+                    child: ListTile(
+                      leading: file.mimeType?.contains('pdf') == true
+                        ? const Icon(Icons.picture_as_pdf, color: Colors.red)
+                        : const Icon(Icons.book, color: Colors.blue),
+                      title: Text(file.name ?? 'Unknown'),
+                      subtitle: Text(file.mimeType ?? ''),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.download),
+                        onPressed: () async {
+                          await _downloadAndImportFile(context, file);
+                        },
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
