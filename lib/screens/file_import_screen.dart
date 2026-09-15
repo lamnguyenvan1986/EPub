@@ -1,9 +1,11 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:libri_audio/services/drive_service.dart';
 import 'package:libri_audio/providers/book_provider.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
+import 'dart:io' show File;
 
 class FileImportScreen extends StatefulWidget {
   const FileImportScreen({super.key});
@@ -202,22 +204,14 @@ class _FileImportScreenState extends State<FileImportScreen> {
   }
 
   Future<void> _handleImportFromDevice() async {
-    // if (kIsWeb) {
-    //   // On web, show a message that file import is not fully supported
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(
-    //       content: Text(
-    //         'File import from device is not fully supported on web. '
-    //         'Please use a mobile device or desktop for file import.',
-    //       ),
-    //     ),
-    //   );
-    //   return;
-    // }
-
+    // Import from device using file picker
     try {
-      final filePath = await _driveService.pickFileFromDevice();
-      if (filePath == null) {
+      PlatformFile? result = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'epub', 'mobi'],
+      );
+
+      if (result == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No file selected')),
@@ -226,9 +220,31 @@ class _FileImportScreenState extends State<FileImportScreen> {
         return;
       }
 
+      final filePath = result.path;
+      if (filePath == null) {
+        if (mounted) {
+          setState(() {
+            _error = 'File path is null';
+          });
+          return;
+        }
+      }
+
       print('Importing file: $filePath');
 
-      await context.read<BookProvider>().importLocalFile(filePath);
+      // Check if file exists
+      final file = File(filePath!);
+      if (!file.existsSync()) {
+        if (mounted) {
+          setState(() {
+            _error = 'File not found: $filePath';
+          });
+          return;
+        }
+      }
+
+      // Import the file using the BookProvider
+      await context.read<BookProvider>().addBookFromFilePath(filePath);
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -261,7 +277,7 @@ class _GoogleDriveBooksScreenState extends State<GoogleDriveBooksScreen> {
   Future<void> _downloadAndImportFile(BuildContext context, drive.File file) async {
     try {
       final driveService = context.read<DriveService>();
-      final filePath = await driveService.downloadFile(file);
+      final filePath = await driveService.downloadFile(file, '');
 
       if (filePath != null) {
         await context.read<BookProvider>().importLocalFile(filePath);

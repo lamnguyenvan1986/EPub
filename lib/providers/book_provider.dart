@@ -37,8 +37,17 @@ class BookProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Download file from Drive
-      final filePath = await _drive.downloadFile(file);
+      // First, create a book with a unique ID
+      final newBook = Book(
+        title: file.name ?? 'unknown',
+        author: 'Unknown',
+        filePath: file.name, // On web, this will be used as identifier
+        fileType: file.mimeType ?? 'application/octet-stream',
+        coverPath: null,
+      );
+
+      // Download file from Drive with the bookId
+      final filePath = await _drive.downloadFile(file, newBook.id);
 
       if (filePath == null) {
         _error = 'Failed to download file';
@@ -47,16 +56,37 @@ class BookProvider with ChangeNotifier {
         return;
       }
 
-      final book = Book(
-        title: file.name ?? 'unknown',
-        author: 'Unknown',
-        filePath: filePath,
-        fileType: file.mimeType ?? 'application/octet-stream',
-        coverPath: null,
+      // Check if book already exists by title
+      final existingBook = _books.firstWhere(
+        (b) => b.title == file.name,
+        orElse: () => Book(title: '', fileType: 'application/octet-stream'),
       );
 
-      _storage.addBook(book);
-      _books.add(book);
+      if (existingBook.id.isNotEmpty && existingBook.filePath != null) {
+        // Book already exists, update it instead of adding
+        final updatedBook = existingBook.copyWith(
+          filePath: filePath,
+          fileType: file.mimeType ?? 'application/octet-stream',
+        );
+        _storage.updateBook(updatedBook);
+        final index = _books.indexWhere((b) => b.id == existingBook.id);
+        if (index != -1) {
+          _books[index] = updatedBook;
+        }
+      } else {
+        // Add new book - set filePath in constructor since it's final
+        final book = Book(
+          title: file.name ?? 'unknown',
+          author: 'Unknown',
+          filePath: filePath,
+          fileType: file.mimeType ?? 'application/octet-stream',
+          coverPath: null,
+        );
+
+        _storage.addBook(book);
+        _books.add(book);
+      }
+
       _isLoading = false;
       notifyListeners();
     } catch (error) {
@@ -74,16 +104,37 @@ class BookProvider with ChangeNotifier {
     try {
       final fileName = filePath.split('/').last;
 
-      final book = Book(
-        title: fileName,
-        author: 'Unknown',
-        filePath: filePath,
-        fileType: DriveService.getMimeType(filePath),
-        coverPath: null,
+      // Check if book already exists
+      final existingBook = _books.firstWhere(
+        (b) => b.filePath == filePath || b.title == fileName,
+        orElse: () => Book(title: '', filePath: '', fileType: 'application/octet-stream'),
       );
 
-      _storage.addBook(book);
-      _books.add(book);
+      if (existingBook.id.isNotEmpty && existingBook.filePath != null) {
+        // Book already exists, update it
+        final updatedBook = existingBook.copyWith(
+          filePath: filePath,
+          fileType: DriveService.getMimeType(filePath),
+        );
+        _storage.updateBook(updatedBook);
+        final index = _books.indexWhere((b) => b.id == existingBook.id);
+        if (index != -1) {
+          _books[index] = updatedBook;
+        }
+      } else {
+        // Add new book
+        final book = Book(
+          title: fileName,
+          author: 'Unknown',
+          filePath: filePath,
+          fileType: DriveService.getMimeType(filePath),
+          coverPath: null,
+        );
+
+        _storage.addBook(book);
+        _books.add(book);
+      }
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -103,20 +154,41 @@ class BookProvider with ChangeNotifier {
     _isLoading = true;
     _error = null;
     notifyListeners();
-    
+
     try {
       final fileName = filePath.split('/').last;
-      
-      final book = Book(
-        title: fileName,
-        author: 'Unknown',
-        filePath: filePath,
-        fileType: DriveService.getMimeType(filePath),
-        coverPath: null,
+
+      // Check if book already exists
+      final existingBook = _books.firstWhere(
+        (b) => b.filePath == filePath || b.title == fileName,
+        orElse: () => Book(title: '', filePath: '', fileType: 'application/octet-stream'),
       );
-      
-      _storage.addBook(book);
-      _books.add(book);
+
+      if (existingBook.id.isNotEmpty && existingBook.filePath != null) {
+        // Book already exists, update it
+        final updatedBook = existingBook.copyWith(
+          filePath: filePath,
+          fileType: DriveService.getMimeType(filePath),
+        );
+        _storage.updateBook(updatedBook);
+        final index = _books.indexWhere((b) => b.id == existingBook.id);
+        if (index != -1) {
+          _books[index] = updatedBook;
+        }
+      } else {
+        // Add new book
+        final book = Book(
+          title: fileName,
+          author: 'Unknown',
+          filePath: filePath,
+          fileType: DriveService.getMimeType(filePath),
+          coverPath: null,
+        );
+
+        _storage.addBook(book);
+        _books.add(book);
+      }
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -185,7 +257,12 @@ class BookProvider with ChangeNotifier {
           orElse: () => Book(title: '', fileType: 'application/octet-stream'),
         );
 
+        // Check if book needs to be added or updated
         if (existingBook.id.isEmpty || existingBook.filePath == null) {
+          // Book doesn't exist or has no file path, add it
+          await addBookFromDrive(file);
+        } else if (existingBook.filePath == null || existingBook.filePath!.isEmpty) {
+          // Book exists but has no valid file path, update it
           await addBookFromDrive(file);
         }
       }

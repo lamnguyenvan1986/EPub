@@ -1,8 +1,9 @@
 import 'dart:convert';
-import 'dart:html' as html;
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
 import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'package:katbook_epub_reader/katbook_epub_reader.dart';
 import 'package:provider/provider.dart';
 import 'package:libri_audio/models/book_model.dart';
 import 'package:share_plus/share_plus.dart';
@@ -25,7 +26,6 @@ class BookReaderScreen extends StatefulWidget {
 class _BookReaderScreenState extends State<BookReaderScreen> {
   late Book _book;
   int _currentChapterIndex = 0;
-  int _currentPosition = 0;
   bool _isAudioMode = false;
   String? _textContent;
   bool _isLoading = true;
@@ -58,19 +58,19 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
   
   Future<void> _loadBook() async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Load saved reading state
       final savedState = StorageService().getReadingState(_book.id);
       if (savedState != null) {
         _currentChapterIndex = savedState.chapterIndex;
-        _currentPosition = savedState.position;
       }
       
-      if (_book.fileType == 'epub') {
+      if (_book.fileType.contains('epub')) {
         await _loadEpub();
-      } else if (_book.fileType == 'pdf') {
-        _isAudioMode = false; // PDF không hỗ trợ TTS tốt
+      } else if (_book.fileType.contains('pdf')) {
+        await _loadPdf();
+        // _isAudioMode = false; // PDF không hỗ trợ TTS tốt
       } else {
         throw Exception('Định dạng file không được hỗ trợ: ${_book.fileType}');
       }
@@ -92,14 +92,105 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
     }
   }
   
+  KatbookEpubController? _epubController;
+  Uint8List? _epubBytes;
+
   Future<void> _loadEpub() async {
     try {
-      if (_book.filePath == null) return;
-      // Use basic EPUB parsing for now - simplified
-      _textContent = 'EPUB content loading...'; // Placeholder
-      return;
+      if (_book.filePath == null) {
+        setState(() {
+          _error = 'Không tìm thấy file EPUB';
+        });
+        return;
+      }
+
+      // Get file bytes from storage
+      final storage = StorageService();
+      final bytes = storage.getBookFileBytes(_book.id);
+
+      if (bytes == null) {
+        // Try to read from file path directly
+        try {
+          final file = File(_book.filePath!);
+          _epubBytes = await file.readAsBytes();
+        } catch (e) {
+          print('Error reading file: $e');
+          throw Exception('Không thể đọc file EPUB');
+        }
+      } else {
+        _epubBytes = Uint8List.fromList(bytes);
+      }
+
+      // Parse EPUB book
+      try {
+        _epubController = KatbookEpubController();
+        final success = await _epubController!.openBook(_epubBytes!);
+        if (!success) {
+          throw Exception('Không thể đọc file EPUB');
+        }
+      } catch (e) {
+        print('Error parsing EPUB: $e');
+        throw Exception('Không thể đọc file EPUB');
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
     } catch (e) {
       print('Error loading EPUB: $e');
+      setState(() {
+        _isLoading = false;
+        _error = 'Lỗi khi đọc file EPUB: ${e.toString()}';
+      });
+    }
+  }
+
+  Uint8List? _pdfBytes;
+
+  Future<void> _loadPdf() async {
+    try {
+      if (kIsWeb) {
+        // On web, get PDF bytes from storage (filePath doesn't exist in browser)
+        // Key is filePath (file name from Drive) not bookId
+        final storage = StorageService();
+        final bytes = storage.getBookFileBytes(_book.filePath ?? '');
+        _pdfBytes = bytes != null ? Uint8List.fromList(bytes) : null;
+
+        if (_pdfBytes == null) {
+          setState(() {
+            _error = 'Không tìm thấy file PDF';
+          });
+          return;
+        }
+      } else {
+        // On mobile/desktop, use file path
+        if (_book.filePath == null) {
+          setState(() {
+            _error = 'Không tìm thấy file PDF';
+          });
+          return;
+        }
+
+        final file = File(_book.filePath!);
+        if (!await file.exists()) {
+          setState(() {
+            _error = 'File PDF không tồn tại';
+          });
+          return;
+        }
+
+        _pdfBytes = await file.readAsBytes();
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading PDF: $e');
+      setState(() {
+        _isLoading = false;
+        _error = 'Lỗi khi đọc file PDF: ${e.toString()}';
+      });
     }
   }
   
@@ -137,7 +228,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       return _buildAudioMode();
     }
     
-    if (_book.fileType == 'pdf') {
+    if (_book.fileType.contains('pdf')) {
       return _buildPdfReader();
     }
     
@@ -209,15 +300,9 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
           ),
         ],
       ),
-      body: _textContent != null
-        ? SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: SelectableText(
-              _textContent!,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          )
-        : const Center(child: Text('No content available')),
+      body: _epubController != null
+        ? _buildEpubViewer()
+        : const Center(child: Text('Loading EPUB...')),
       floatingActionButton: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -239,6 +324,38 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
     );
   }
 
+  Widget _buildEpubViewer() {
+    try {
+      return KatbookEpubReader(
+        controller: _epubController!,
+        initialTheme: ReaderTheme.light,
+        initialFontSize: 16.0,
+        showAppBar: false,
+        onChapterChanged: (chapter) {
+          _currentChapterIndex = chapter.startIndex;
+        },
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        contentWidthPercent: 0.85,
+      );
+    } catch (e) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('EPUB Error: ${e.toString()}'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _loadBook(),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   // Web-specific PDF viewer using iframe
   Widget _buildPdfReaderWeb(String dataUri) {
     return Scaffold(
@@ -257,16 +374,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       ),
       body: Builder(
         builder: (context) {
-          // Use dart:html to create iframe on web
-          final iframe = html.IFrameElement()
-            ..src = dataUri
-            ..style.border = 'none'
-            ..style.width = '100%'
-            ..style.height = '100%';
-
-          // Add to body and return a placeholder widget
-          html.document.body?.append(iframe);
-
+         
           // Return a widget that keeps the iframe alive
           return Container();
         },
@@ -276,16 +384,10 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
 
   Widget _buildPdfReader() {
     if (kIsWeb) {
-      // On web, use an iframe to display PDF
-      // The filePath on web is just a filename, we need to get the actual bytes
-      final storage = StorageService();
-      final bytes = storage.getBookFileBytes(_book.id);
-
-      if (bytes != null) {
-        // Convert bytes to base64 data URI
-        final base64Pdf = base64Encode(bytes);
+      // On web, use data URI from pdfBytes
+      if (_pdfBytes != null) {
+        final base64Pdf = base64Encode(_pdfBytes!);
         final dataUri = 'data:application/pdf;base64,$base64Pdf';
-
         return _buildPdfReaderWeb(dataUri);
       }
 
@@ -312,6 +414,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       );
     }
 
+    // On mobile/desktop, use File path
     return Scaffold(
       appBar: AppBar(
         title: Text(_book.title),
@@ -423,40 +526,41 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
     }
   }
   
-  void _goToNextChapter() {
-    final total = _getTotalChapters();
-    if (_currentChapterIndex < total - 1) {
-      _currentChapterIndex++;
-      _loadEpub();
-      context.read<BookProvider>().saveReadingProgress(
-        _book.id, _currentChapterIndex, _currentPosition,
-      );
+  Future<void> _goToNextChapter() async {
+    if (_epubController != null) {
+      final chapters = _epubController?.flatChapters ?? [];
+      if (chapters.isNotEmpty && _currentChapterIndex < chapters.length - 1) {
+        _currentChapterIndex++;
+        context.read<BookProvider>().saveReadingProgress(
+          _book.id, _currentChapterIndex, 0,
+        );
+        setState(() {});
+      }
     }
   }
-  
-  void _goToPreviousChapter() {
-    if (_currentChapterIndex > 0) {
+
+  Future<void> _goToPreviousChapter() async {
+    if (_epubController != null && _currentChapterIndex > 0) {
       _currentChapterIndex--;
-      _loadEpub();
       context.read<BookProvider>().saveReadingProgress(
-        _book.id, _currentChapterIndex, _currentPosition,
+        _book.id, _currentChapterIndex, 0,
       );
+      setState(() {});
     }
   }
-  
-  void _goToNextChapterAudio() {
-    _goToNextChapter();
+
+  void _goToNextChapterAudio() async {
+    await _goToNextChapter();
     _startAudioReading();
   }
-  
-  void _goToPreviousChapterAudio() {
-    _goToPreviousChapter();
+
+  void _goToPreviousChapterAudio() async {
+    await _goToPreviousChapter();
     _startAudioReading();
   }
-  
+
   int _getTotalChapters() {
-    // This would need to be implemented properly with EPUB parsing
-    return 1; // Placeholder
+    return _epubController?.tableOfContents.length ?? 1;
   }
   
   void _showSearchDialog() {

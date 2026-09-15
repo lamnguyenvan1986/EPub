@@ -4,7 +4,7 @@ class TtsService extends ChangeNotifier {
   bool _isSpeaking = false;
   double _rate = 1.0;
   double _pitch = 1.0;
-  String _selectedVoice = '';
+  String _selectedVoice = 'vi-VN';
   String _language = 'vi-VN';
   
   final List<String> _languages = ['vi-VN', 'en-US'];

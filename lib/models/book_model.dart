@@ -1,6 +1,7 @@
 // GENERATED FILE - DO NOT EDIT
 // Run: flutter pub run build_runner build
 
+import 'dart:math';
 import 'package:hive/hive.dart';
 
 part 'book_model.g.dart';
@@ -9,13 +10,13 @@ part 'book_model.g.dart';
 class Book {
   @HiveField(0)
   final String id;
-  
+
   @HiveField(1)
   final String title;
-  
+
   @HiveField(2)
   final String? author;
-  
+
   @HiveField(3)
   final String? filePath;
 
@@ -27,7 +28,7 @@ class Book {
 
   @HiveField(6)
   final DateTime createdAt;
-  
+
   @HiveField(7)
   final DateTime? lastRead;
 
@@ -39,7 +40,7 @@ class Book {
 
   @HiveField(10)
   final int? position;
-  
+
   Book({
     String? id,
     required this.title,
@@ -52,8 +53,17 @@ class Book {
     this.lastRead,
     this.chapterIndex,
     this.position,
-  }) : id = id ?? '',
+  }) : id = id ?? _generateId(),
        createdAt = createdAt ?? DateTime.now();
+
+  static String _generateId() {
+    final random = Random();
+    final chars = List.generate(16, (index) {
+      final num = random.nextInt(36);
+      return num < 10 ? num.toString() : String.fromCharCode(num + 87);
+    });
+    return chars.join();
+  }
 
   Map<String, dynamic> toMap() {
     return {

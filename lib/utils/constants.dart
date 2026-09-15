@@ -63,6 +63,11 @@ class AppTheme {
         borderRadius: BorderRadius.circular(16),
       ),
     ),
+    textTheme: const TextTheme(
+      bodyLarge: TextStyle(fontFamily: 'NotoSans', fontSize: 16),
+      bodyMedium: TextStyle(fontFamily: 'NotoSans', fontSize: 14),
+      bodySmall: TextStyle(fontFamily: 'NotoSans', fontSize: 12),
+    ),
   );
 
   static ThemeData darkTheme = ThemeData(
@@ -92,6 +97,11 @@ class AppTheme {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
+    ),
+    textTheme: const TextTheme(
+      bodyLarge: TextStyle(fontFamily: 'NotoSans', fontSize: 16),
+      bodyMedium: TextStyle(fontFamily: 'NotoSans', fontSize: 14),
+      bodySmall: TextStyle(fontFamily: 'NotoSans', fontSize: 12),
     ),
   );
 }

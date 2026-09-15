@@ -30,8 +30,8 @@ class DriveService {
 
   /// Check if Google Sign-In is supported on this platform
   /// google_sign_in is deprecated on web and will be removed
-  bool get isGoogleSignInSupported => !kIsWeb;
-
+  /// Also not supported on Linux - use file picker instead
+  bool get isGoogleSignInSupported => !kIsWeb ;
   Future<GoogleSignInAccount?> signIn() async {
     if (kIsWeb) {
       print('Google Sign-In is not supported on web. Use Google Identity Services instead.');
@@ -117,7 +117,10 @@ class DriveService {
     return [...pdfFiles, ...epubFiles, ...mobiFiles];
   }
 
-  Future<String?> downloadFile(drive.File file) async {
+  /// Download file and return the file path/identifier
+  /// On web, returns a fake path; bytes are stored in Hive with bookId
+  /// On mobile/desktop, returns the actual file path
+  Future<String?> downloadFile(drive.File file, String? bookId) async {
     if (_driveApi == null) {
       return null;
     }
@@ -130,15 +133,26 @@ class DriveService {
       final bytes = await media.stream.toList();
       final buffer = bytes.expand((e) => e).toList();
 
-      // Save to local storage
-      final dir = await getApplicationDocumentsDirectory();
-      final filename = file.name ?? 'file_${file.id}';
-      final filePath = p.join(dir.path, filename);
+      // On web, save file bytes to Hive; on mobile/desktop, save to file system
+      if (kIsWeb) {
+        // For web, save bytes to Hive with bookId as key
+        if (bookId != null && bookId.isNotEmpty) {
+          final storageService = StorageService();
+          await storageService.saveBookFileBytes(bookId, buffer);
+        }
+        // Return a fake path for web (will use fileBytes instead)
+        return file.name;
+      } else {
+        // Save to local storage on mobile/desktop
+        final dir = await getApplicationDocumentsDirectory();
+        final filename = file.name ?? 'file_${file.id}';
+        final filePath = p.join(dir.path, filename);
 
-      final fileObj = File(filePath);
-      await fileObj.writeAsBytes(buffer);
+        final fileObj = File(filePath);
+        await fileObj.writeAsBytes(buffer);
 
-      return filePath;
+        return filePath;
+      }
     } catch (e) {
       print('Error downloading file: $e');
       return null;
@@ -153,6 +167,26 @@ class DriveService {
       return _pickFileFromDeviceWeb();
     } else {
       return _pickFileFromDeviceMobile();
+    }
+  }
+
+  /// Import a specific file by path directly (for importing known file paths)
+  Future<String?> importFileByPath(String path) async {
+    if (kIsWeb) {
+      // On web, read bytes from the file
+      try {
+        final file = File(path);
+        final bytes = await file.readAsBytes();
+        final fileName = p.basename(path);
+        final storageService = StorageService();
+        return await storageService.saveFileBytes(fileName, bytes);
+      } catch (e) {
+        print('Error reading file: $e');
+        return null;
+      }
+    } else {
+      // On Linux, use the file path directly
+      return path;
     }
   }
 
