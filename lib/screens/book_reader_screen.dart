@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
-import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:katbook_epub_reader/katbook_epub_reader.dart';
 import 'package:provider/provider.dart';
 import 'package:libri_audio/models/book_model.dart';
@@ -12,6 +11,7 @@ import 'package:libri_audio/services/storage_service.dart';
 import 'package:libri_audio/widgets/voice_selector.dart';
 import 'package:libri_audio/screens/search_screen.dart';
 import 'package:libri_audio/providers/book_provider.dart' show BookProvider;
+import 'package:libri_audio/widgets/pdf_viewer.dart';
 
 class BookReaderScreen extends StatefulWidget {
   final Book book;
@@ -414,30 +414,33 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       );
     }
 
-    // On mobile/desktop, use File path
+    // On mobile/desktop, use PdfViewer with pdfBytes
+    if (_pdfBytes != null) {
+      return PdfViewer(
+        pdfBytes: _pdfBytes!,
+        fileName: _book.title,
+      );
+    }
+
+    // Fallback if no bytes available
     return Scaffold(
       appBar: AppBar(
         title: Text(_book.title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.volume_up),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('PDF text-to-speech not supported')),
-              );
-            },
-          ),
-        ],
       ),
-      body: PDFView(
-        filePath: _book.filePath!,
-        enableSwipe: true,
-        swipeHorizontal: true,
-        autoSpacing: true,
-        pageFling: true,
-        pageSnap: true,
-        defaultPage: _currentChapterIndex,
-        fitPolicy: FitPolicy.BOTH,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text('PDF file not loaded'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _loadBook(),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }

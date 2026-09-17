@@ -31,71 +31,83 @@ class BookProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Helper method to add or update a book
+  Future<void> _addOrUpdateBook({
+    required String title,
+    required String filePath,
+    required String fileType,
+    String? author,
+    String? coverPath,
+    bool fromDrive = false,
+    drive.File? driveFile,
+  }) async {
+    final fileName = filePath.split('/').last;
+
+    // Check if book already exists
+    final existingBook = _books.firstWhere(
+      (b) => b.filePath == filePath || b.title == fileName,
+      orElse: () => Book(title: '', filePath: '', fileType: 'application/octet-stream'),
+    );
+
+    if (existingBook.id.isNotEmpty && existingBook.filePath != null) {
+      // Book already exists, update it
+      final updatedBook = existingBook.copyWith(
+        filePath: filePath,
+        fileType: fileType,
+      );
+      _storage.updateBook(updatedBook);
+      final index = _books.indexWhere((b) => b.id == existingBook.id);
+      if (index != -1) {
+        _books[index] = updatedBook;
+      }
+    } else {
+      // Add new book
+      final book = Book(
+        title: title,
+        author: author ?? 'Unknown',
+        filePath: filePath,
+        fileType: fileType,
+        coverPath: coverPath,
+      );
+
+      if (fromDrive && driveFile != null) {
+        // For Drive files, download first then add
+        final downloadedPath = await _drive.downloadFile(driveFile, book.id);
+        if (downloadedPath == null) {
+          _error = 'Failed to download file from Drive';
+          notifyListeners();
+          return;
+        }
+        book.copyWith(filePath: downloadedPath);
+      }
+
+      _storage.addBook(book);
+      _books.add(book);
+    }
+  }
+
   Future<void> addBookFromDrive(drive.File file) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // First, create a book with a unique ID
-      final newBook = Book(
+      await _addOrUpdateBook(
         title: file.name ?? 'unknown',
-        author: 'Unknown',
-        filePath: file.name, // On web, this will be used as identifier
+        filePath: file.name ?? '',
         fileType: file.mimeType ?? 'application/octet-stream',
-        coverPath: null,
+        author: 'Unknown',
+        fromDrive: true,
+        driveFile: file,
       );
-
-      // Download file from Drive with the bookId
-      final filePath = await _drive.downloadFile(file, newBook.id);
-
-      if (filePath == null) {
-        _error = 'Failed to download file';
-        _isLoading = false;
-        notifyListeners();
-        return;
-      }
-
-      // Check if book already exists by title
-      final existingBook = _books.firstWhere(
-        (b) => b.title == file.name,
-        orElse: () => Book(title: '', fileType: 'application/octet-stream'),
-      );
-
-      if (existingBook.id.isNotEmpty && existingBook.filePath != null) {
-        // Book already exists, update it instead of adding
-        final updatedBook = existingBook.copyWith(
-          filePath: filePath,
-          fileType: file.mimeType ?? 'application/octet-stream',
-        );
-        _storage.updateBook(updatedBook);
-        final index = _books.indexWhere((b) => b.id == existingBook.id);
-        if (index != -1) {
-          _books[index] = updatedBook;
-        }
-      } else {
-        // Add new book - set filePath in constructor since it's final
-        final book = Book(
-          title: file.name ?? 'unknown',
-          author: 'Unknown',
-          filePath: filePath,
-          fileType: file.mimeType ?? 'application/octet-stream',
-          coverPath: null,
-        );
-
-        _storage.addBook(book);
-        _books.add(book);
-      }
-
-      _isLoading = false;
-      notifyListeners();
     } catch (error) {
       _error = error.toString();
+    } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
-  
+
   Future<void> addBookFromFilePath(String filePath) async {
     _isLoading = true;
     _error = null;
@@ -104,42 +116,16 @@ class BookProvider with ChangeNotifier {
     try {
       final fileName = filePath.split('/').last;
 
-      // Check if book already exists
-      final existingBook = _books.firstWhere(
-        (b) => b.filePath == filePath || b.title == fileName,
-        orElse: () => Book(title: '', filePath: '', fileType: 'application/octet-stream'),
+      await _addOrUpdateBook(
+        title: fileName,
+        filePath: filePath,
+        fileType: DriveService.getMimeType(filePath),
+        author: 'Unknown',
       );
-
-      if (existingBook.id.isNotEmpty && existingBook.filePath != null) {
-        // Book already exists, update it
-        final updatedBook = existingBook.copyWith(
-          filePath: filePath,
-          fileType: DriveService.getMimeType(filePath),
-        );
-        _storage.updateBook(updatedBook);
-        final index = _books.indexWhere((b) => b.id == existingBook.id);
-        if (index != -1) {
-          _books[index] = updatedBook;
-        }
-      } else {
-        // Add new book
-        final book = Book(
-          title: fileName,
-          author: 'Unknown',
-          filePath: filePath,
-          fileType: DriveService.getMimeType(filePath),
-          coverPath: null,
-        );
-
-        _storage.addBook(book);
-        _books.add(book);
-      }
-
-      _isLoading = false;
-      notifyListeners();
     } catch (e) {
-      _isLoading = false;
       _error = e.toString();
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
@@ -149,7 +135,7 @@ class BookProvider with ChangeNotifier {
     _books.add(book);
     notifyListeners();
   }
-  
+
   Future<void> importLocalFile(String filePath) async {
     _isLoading = true;
     _error = null;
@@ -158,51 +144,25 @@ class BookProvider with ChangeNotifier {
     try {
       final fileName = filePath.split('/').last;
 
-      // Check if book already exists
-      final existingBook = _books.firstWhere(
-        (b) => b.filePath == filePath || b.title == fileName,
-        orElse: () => Book(title: '', filePath: '', fileType: 'application/octet-stream'),
+      await _addOrUpdateBook(
+        title: fileName,
+        filePath: filePath,
+        fileType: DriveService.getMimeType(filePath),
+        author: 'Unknown',
       );
-
-      if (existingBook.id.isNotEmpty && existingBook.filePath != null) {
-        // Book already exists, update it
-        final updatedBook = existingBook.copyWith(
-          filePath: filePath,
-          fileType: DriveService.getMimeType(filePath),
-        );
-        _storage.updateBook(updatedBook);
-        final index = _books.indexWhere((b) => b.id == existingBook.id);
-        if (index != -1) {
-          _books[index] = updatedBook;
-        }
-      } else {
-        // Add new book
-        final book = Book(
-          title: fileName,
-          author: 'Unknown',
-          filePath: filePath,
-          fileType: DriveService.getMimeType(filePath),
-          coverPath: null,
-        );
-
-        _storage.addBook(book);
-        _books.add(book);
-      }
-
-      _isLoading = false;
-      notifyListeners();
     } catch (e) {
-      _isLoading = false;
       _error = e.toString();
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
-  
+
   void setCurrentBook(Book book) {
     _currentBook = book;
     notifyListeners();
   }
-  
+
   void removeBook(String bookId) {
     _storage.removeBook(bookId);
     _books.removeWhere((book) => book.id == bookId);
@@ -211,7 +171,7 @@ class BookProvider with ChangeNotifier {
     }
     notifyListeners();
   }
-  
+
   void updateBook(Book book) {
     _storage.updateBook(book);
     final index = _books.indexWhere((b) => b.id == book.id);
@@ -220,10 +180,10 @@ class BookProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   void saveReadingProgress(String bookId, int chapterIndex, int position) {
     _storage.saveReadingState(bookId, chapterIndex, position);
-    
+
     final bookIndex = _books.indexWhere((b) => b.id == bookId);
     if (bookIndex != -1) {
       _books[bookIndex] = _books[bookIndex].copyWith(
@@ -233,11 +193,11 @@ class BookProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   Future<void> refreshBooks() async {
     await _loadBooks();
   }
-  
+
   Future<void> syncWithDrive() async {
     _isSyncing = true;
     notifyListeners();

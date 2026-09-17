@@ -11,14 +11,18 @@ import 'package:libri_audio/services/tts_service.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  setUpAll(() async {
-    // Initialize storage before tests
-    await StorageService().init();
-  });
-
   group('Feature Tests', () {
     testWidgets('App starts with empty book list', (WidgetTester tester) async {
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => BookProvider()),
+            ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider(create: (_) => TtsService()),
+          ],
+          child: const MyApp(),
+        ),
+      );
 
       // Check that home screen is displayed
       expect(find.byType(HomeScreen), findsOneWidget);
@@ -27,24 +31,35 @@ void main() {
 
     testWidgets('Dark mode toggle works', (WidgetTester tester) async {
       await tester.pumpWidget(
-        ChangeNotifierProvider(
-          create: (_) => ThemeProvider(),
-          child: const MyApp(),
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider(create: (_) => TtsService()),
+          ],
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) {
+                final provider = Provider.of<ThemeProvider>(context, listen: false);
+                return Scaffold(
+                  body: Center(
+                    child: Text(provider.isDarkMode ? 'Dark' : 'Light'),
+                  ),
+                );
+              },
+            ),
+          ),
         ),
       );
 
-      // Use a Finder to locate a widget and get its context
-      final themeFinder = find.byType(ThemeProvider);
-      final themeProvider = Provider.of<ThemeProvider>(tester.element(themeFinder), listen: false);
-
       // Initial state should be light
-      expect(themeProvider.isDarkMode, false);
+      expect(find.text('Light'), findsOneWidget);
 
       // Toggle dark mode
-      themeProvider.toggleTheme();
+      final provider = Provider.of<ThemeProvider>(tester.element(find.byType(ThemeProvider)), listen: false);
+      provider.toggleTheme();
       await tester.pump();
 
-      expect(themeProvider.isDarkMode, true);
+      expect(find.text('Dark'), findsOneWidget);
     });
 
     testWidgets('Book can be added to list', (WidgetTester tester) async {
@@ -131,9 +146,18 @@ void main() {
       final themeFinder = find.byType(ThemeProvider);
       final ttsFinder = find.byType(TtsService);
 
-      expect(Provider.of<BookProvider>(tester.element(bookFinder), listen: false), isNotNull);
-      expect(Provider.of<ThemeProvider>(tester.element(themeFinder), listen: false), isNotNull);
-      expect(Provider.of<TtsService>(tester.element(ttsFinder), listen: false), isNotNull);
+      expect(
+        Provider.of<BookProvider>(tester.element(bookFinder), listen: false),
+        isNotNull,
+      );
+      expect(
+        Provider.of<ThemeProvider>(tester.element(themeFinder), listen: false),
+        isNotNull,
+      );
+      expect(
+        Provider.of<TtsService>(tester.element(ttsFinder), listen: false),
+        isNotNull,
+      );
     });
 
     testWidgets('Theme persists across rebuilds', (WidgetTester tester) async {
@@ -142,21 +166,20 @@ void main() {
           create: (_) => ThemeProvider(),
           child: MaterialApp(
             home: Builder(
-              builder: (context) => Consumer<ThemeProvider>(
-                builder: (context, themeProvider, child) {
-                  return Container(
-                    color: themeProvider.isDarkMode ? Colors.black : Colors.white,
-                    child: Text('Theme Test'),
-                  );
-                },
-              ),
+              builder: (context) {
+                final provider = Provider.of<ThemeProvider>(context, listen: false);
+                return Container(
+                  color: provider.isDarkMode ? Colors.black : Colors.white,
+                  child: const Text('Theme Test'),
+                );
+              },
             ),
           ),
         ),
       );
 
-      final themeFinder = find.byType(ThemeProvider);
-      final themeProvider = Provider.of<ThemeProvider>(tester.element(themeFinder), listen: false);
+      final themeProvider =
+          Provider.of<ThemeProvider>(tester.element(find.byType(ThemeProvider)), listen: false);
 
       themeProvider.setDarkMode();
       await tester.pump();

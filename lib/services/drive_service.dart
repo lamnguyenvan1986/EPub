@@ -11,18 +11,21 @@ import 'dart:io' show File;
 
 class DriveService {
   drive.DriveApi? _driveApi;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    // Thay bằng Client ID của bạn từ Google Cloud Console
-    // Để trống hoặc dùng null cho development
-    clientId: '577711935566-ru5fvsii1r4jrgsckg8ku22vgq48anrt.apps.googleusercontent.com',
-    scopes: [
-      drive.DriveApi.driveFileScope,
-      drive.DriveApi.driveReadonlyScope,
-    ],
-  );
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+
+  /// Whether the service has been initialized
+  bool _isInitialized = false;
 
   DriveService() {
-    // Khởi tạo - sẽ setup khi authenticate
+    // Initialize the singleton instance with config
+    // Note: initialize must be called once and awaited before other methods
+    if (!_isInitialized) {
+      _googleSignIn.initialize(
+        clientId:
+            '577711935566-ru5fvsii1r4jrgsckg8ku22vgq48anrt.apps.googleusercontent.com',
+      );
+      _isInitialized = true;
+    }
   }
 
   drive.DriveApi? get driveApi => _driveApi;
@@ -31,14 +34,15 @@ class DriveService {
   /// Check if Google Sign-In is supported on this platform
   /// google_sign_in is deprecated on web and will be removed
   /// Also not supported on Linux - use file picker instead
-  bool get isGoogleSignInSupported => !kIsWeb ;
+  bool get isGoogleSignInSupported => !kIsWeb;
+
   Future<GoogleSignInAccount?> signIn() async {
     if (kIsWeb) {
       print('Google Sign-In is not supported on web. Use Google Identity Services instead.');
       return null;
     }
     try {
-      final account = await _googleSignIn.signIn();
+      final account = await _googleSignIn.authenticate();
       return account;
     } catch (error) {
       print('Error signing in: $error');
@@ -51,7 +55,14 @@ class DriveService {
     _driveApi = null;
   }
 
-  GoogleSignInAccount? get currentUser => _googleSignIn.currentUser;
+  /// Get the current signed-in account
+  /// In google_sign_in 7.x, there's no currentUser getter.
+  /// You need to track this yourself or use authenticationEvents stream.
+  Future<GoogleSignInAccount?> getCurrentUser() async {
+    // The new API doesn't expose a simple way to get the current user.
+    // Users should store the account after successful authentication.
+    return null;
+  }
 
   Future<bool> authenticate() async {
     if (kIsWeb) {
@@ -63,12 +74,21 @@ class DriveService {
       // Check if already authenticated
       if (_driveApi != null) return true;
 
-      final account = await _googleSignIn.signIn();
-      if (account == null) return false;
+      final account = await _googleSignIn.authenticate();
 
-      final authResponse = await account.authentication;
-      // In googleapis_auth 1.6.0, AccessToken takes 3 params: type, data, expiry
-      final accessToken = auth.AccessToken('Bearer', authResponse.accessToken!, DateTime.now().add(const Duration(hours: 1)));
+      // Get access token for Drive API using authorizationClient
+      final authz = await account.authorizationClient.authorizeScopes([
+        drive.DriveApi.driveFileScope,
+        drive.DriveApi.driveReadonlyScope,
+      ]);
+      // Note: authorizeScopes throws on failure, so authz is guaranteed non-null here
+
+      // In googleapis_auth 2.x, AccessToken takes 3 params: type, data, expiry
+      final accessToken = auth.AccessToken(
+        'Bearer',
+        authz.accessToken,
+        DateTime.now().add(const Duration(hours: 1)),
+      );
       // AccessCredentials order: accessToken, refreshToken, scopes
       final credentials = auth.AccessCredentials(
         accessToken,
@@ -126,7 +146,8 @@ class DriveService {
     }
 
     try {
-      final response = await _driveApi!.files.get(file.id!, downloadOptions: drive.DownloadOptions.fullMedia);
+      final response = await _driveApi!.files.get(file.id!,
+          downloadOptions: drive.DownloadOptions.fullMedia);
       final media = response as drive.Media;
 
       // Media has a stream property that emits List<int>
