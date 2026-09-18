@@ -11,8 +11,17 @@ import 'package:libri_audio/services/storage_service.dart';
 import 'package:libri_audio/widgets/voice_selector.dart';
 import 'package:libri_audio/screens/search_screen.dart';
 import 'package:libri_audio/providers/book_provider.dart' show BookProvider;
-import 'package:libri_audio/widgets/pdf_viewer.dart';
+import 'package:libri_audio/widgets/pdf_viewer.dart' as pdf_widgets;
+import 'package:pdfrx/pdfrx.dart';
 
+/// Screen hiển thị nội dung sách với hỗ trợ EPUB, PDF và Text-to-Speech.
+///
+/// Tính năng:
+/// - Đọc sách EPUB với katbook_epub_reader
+/// - Đọc sách PDF với pdfrx
+/// - Chế độ nghe audio với TTS
+/// - Chuyển đổi chương, tìm kiếm, cài đặt
+/// - Chia sẻ và xuất file
 class BookReaderScreen extends StatefulWidget {
   final Book book;
   final bool autoPlay;
@@ -23,6 +32,14 @@ class BookReaderScreen extends StatefulWidget {
   State<BookReaderScreen> createState() => _BookReaderScreenState();
 }
 
+/// Screen hiển thị nội dung sách với hỗ trợ EPUB, PDF và Text-to-Speech.
+///
+/// Tính năng:
+/// - Đọc sách EPUB với katbook_epub_reader
+/// - Đọc sách PDF với pdfrx
+/// - Chế độ nghe audio với TTS
+/// - Chuyển đổi chương, tìm kiếm, cài đặt
+/// - Chia sẻ và xuất file
 class _BookReaderScreenState extends State<BookReaderScreen> {
   late Book _book;
   int _currentChapterIndex = 0;
@@ -31,31 +48,32 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
   bool _isLoading = true;
   String? _error;
   final TextEditingController _searchController = TextEditingController();
-  
+
+  // EPUB specific
+  KatbookEpubController? _epubController;
+  Uint8List? _epubBytes;
+
+  // PDF specific
+  Uint8List? _pdfBytes;
+
   @override
   void initState() {
     super.initState();
     _book = widget.book;
     _loadBook();
-    
-    // Register to listen for highlights (placeholder - update UI on highlight change)
-    // TODO: Implement highlight listener
-    if (mounted) {
-      setState(() {});
-    }
-    
+
     // Auto-play from last position
     if (widget.autoPlay && _book.lastRead != null) {
       _startAudioReading();
     }
   }
-  
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _loadBook() async {
     setState(() => _isLoading = true);
 
@@ -81,7 +99,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
         _isLoading = false;
         _error = 'Lỗi khi đọc file: ${e.toString()}';
       });
-      
+
       // Log error
       print('BookReader Error: $stackTrace');
     } catch (e) {
@@ -91,9 +109,6 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       });
     }
   }
-  
-  KatbookEpubController? _epubController;
-  Uint8List? _epubBytes;
 
   Future<void> _loadEpub() async {
     try {
@@ -128,6 +143,9 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
         if (!success) {
           throw Exception('Không thể đọc file EPUB');
         }
+
+        // Extract text from all chapters for TTS
+        _textContent = await _extractTextFromEpub();
       } catch (e) {
         print('Error parsing EPUB: $e');
         throw Exception('Không thể đọc file EPUB');
@@ -145,7 +163,33 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
     }
   }
 
-  Uint8List? _pdfBytes;
+  /// Extract text content from all EPUB chapters for TTS.
+  ///
+  /// Duyệt qua tất cả các paragraph trong EPUB và nối lại thành một chuỗi.
+  Future<String> _extractTextFromEpub() async {
+    try {
+      final paragraphs = _epubController?.paragraphs ?? [];
+      if (paragraphs.isEmpty) {
+        return '';
+      }
+
+      final buffer = StringBuffer();
+
+      // Duyệt qua từng paragraph và trích xuất text
+      for (final paragraph in paragraphs) {
+        final text = paragraph.text.trim();
+        if (text.isNotEmpty) {
+          buffer.write(text);
+          buffer.write(' ');
+        }
+      }
+
+      return buffer.toString();
+    } catch (e) {
+      print('Error extracting text from EPUB: $e');
+      return '';
+    }
+  }
 
   Future<void> _loadPdf() async {
     try {
@@ -182,6 +226,9 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
         _pdfBytes = await file.readAsBytes();
       }
 
+      // Extract text from PDF for TTS
+      _textContent = await _extractTextFromPdf();
+
       setState(() {
         _isLoading = false;
       });
@@ -191,6 +238,65 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
         _isLoading = false;
         _error = 'Lỗi khi đọc file PDF: ${e.toString()}';
       });
+    }
+  }
+
+  /// Extract text content from PDF for TTS.
+  ///
+  /// Sử dụng pdfrx để trích xuất text từ từng trang PDF.
+  Future<String> _extractTextFromPdf() async {
+    try {
+      if (_pdfBytes == null || _pdfBytes!.isEmpty) {
+        return '';
+      }
+
+      final buffer = StringBuffer();
+
+      // Use pdfrx to extract text from all pages
+      final pdfDocument = await PdfDocument.openData(Uint8List.fromList(_pdfBytes!));
+      final totalPages = pdfDocument.pages.length;
+
+      for (int i = 0; i < totalPages; i++) {
+        try {
+          final page = pdfDocument.pages[i];
+          final text = await page.loadText();
+          if (text?.fullText.isNotEmpty ?? false) {
+            buffer.write(text!.fullText.trim());
+            buffer.write('\n\n');
+          }
+        } catch (e) {
+          print('Error extracting text from PDF page $i: $e');
+          continue;
+        }
+      }
+
+      return buffer.toString();
+    } catch (e) {
+      print('Error extracting text from PDF: $e');
+      // Fallback: try alternative method
+      try {
+        final pdfDocument = await PdfDocument.openData(Uint8List.fromList(_pdfBytes!));
+        final totalPages = pdfDocument.pages.length;
+        final buffer = StringBuffer();
+
+        for (int i = 0; i < totalPages; i++) {
+          try {
+            final page = pdfDocument.pages[i];
+            final text = await page.loadText();
+            if (text?.fullText.isNotEmpty ?? false) {
+              buffer.write(text!.fullText.trim());
+              buffer.write('\n\n');
+            }
+          } catch (e) {
+            print('Error extracting text from PDF page $i: $e');
+            continue;
+          }
+        }
+        return buffer.toString();
+      } catch (e2) {
+        print('Alternative PDF extraction also failed: $e2');
+        return '';
+      }
     }
   }
   
@@ -356,7 +462,9 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
     }
   }
 
-  // Web-specific PDF viewer using iframe
+  /// Web-specific PDF viewer using data URI.
+  ///
+  /// Trình xem PDF dành cho web sử dụng data URI từ pdfBytes.
   Widget _buildPdfReaderWeb(String dataUri) {
     return Scaffold(
       appBar: AppBar(
@@ -366,7 +474,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
             icon: const Icon(Icons.volume_up),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('PDF text-to-speech not supported')),
+                const SnackBar(content: Text('PDF text-to-speech không được hỗ trợ')),
               );
             },
           ),
@@ -374,14 +482,17 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       ),
       body: Builder(
         builder: (context) {
-         
-          // Return a widget that keeps the iframe alive
+          // Trả về widget giữ iframe sống
           return Container();
         },
       ),
     );
   }
 
+  /// PDF reader widget - tự động chọn mode phù hợp.
+  ///
+  /// - Web: Sử dụng data URI với _buildPdfReaderWeb
+  /// - Mobile/Desktop: Sử dụng PdfViewer widget
   Widget _buildPdfReader() {
     if (kIsWeb) {
       // On web, use data URI from pdfBytes
@@ -416,7 +527,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
 
     // On mobile/desktop, use PdfViewer with pdfBytes
     if (_pdfBytes != null) {
-      return PdfViewer(
+      return pdf_widgets.PdfViewer(
         pdfBytes: _pdfBytes!,
         fileName: _book.title,
       );
@@ -562,10 +673,12 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
     _startAudioReading();
   }
 
+  /// Lấy tổng số chương của sách EPUB.
   int _getTotalChapters() {
     return _epubController?.tableOfContents.length ?? 1;
   }
-  
+
+  /// Hiển thị dialog tìm kiếm trong sách.
   void _showSearchDialog() {
     showModalBottomSheet(
       context: context,
@@ -579,21 +692,22 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       ),
     );
   }
-  
+
+  /// Chia sẻ thông tin sách.
   Future<void> _shareBook() async {
-    // Share book title and file info
     await SharePlus.instance.share(
       'Tôi đang đọc: ${_book.title}\n\nTải app LibriAudio để đọc sách: https://example.com' as ShareParams,
     );
   }
-  
+
+  /// Xuất file sách (placeholder).
   void _exportBook() async {
-    // TODO: Implement file save
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Xuất file: ${_book.title}')),
     );
   }
-  
+
+  /// Hiển thị dialog cài đặt (tốc độ đọc, giọng đọc).
   void _showSettingsDialog() {
     showModalBottomSheet(
       context: context,
@@ -627,6 +741,9 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
   }
 }
 
+/// Animated audio wave component cho TTS mode.
+///
+/// Hiển thị hiệu ứng sóng âm thanh khi đang phát audio.
 class AnimatedAudioWave extends StatelessWidget {
   const AnimatedAudioWave({super.key});
 

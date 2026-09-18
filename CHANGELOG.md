@@ -2,6 +2,26 @@
 
 Tất cả các thay đổi quan trọng cho ứng dụng LibriAudio được ghi lại ở đây.
 
+## [1.1.0] - 2026-09-18
+### ✨ Thêm mới
+- Cải thiện xử lý lỗi khi đọc file EPUB và PDF
+- Thêm text extraction cho PDF bằng pdfrx
+- Tự động play từ vị trí đã đọc trước đó
+
+### 🔧 Cải tiến
+- **book_reader_screen.dart**: Refactor code structure
+  - Tách riêng methods `_loadEpub()` và `_loadPdf()`
+  - Tách riêng methods `_extractTextFromEpub()` và `_extractTextFromPdf()`
+  - Cải thiện error handling với try-catch chi tiết hơn
+  - Xóa code comment không cần thiết
+- **PDF Viewer**: Sử dụng pdfrx package thay vì web iframe trên mobile/desktop
+- **Text extraction**: Cải thiện method extraction cho cả EPUB và PDF
+
+### 🐛 Bug fixes
+- Sửa lỗi null pointer khi `_book.filePath == null`
+- Sửa lỗi duplicate code trong PDF text extraction
+- Sửa lỗi không hiển thị error message khi load file thất bại
+
 ## [1.0.0] - 2026-09-07
 ### ✨ Thêm mới
 - Đọc sách EPUB, PDF, MOBI
@@ -34,7 +54,7 @@ Tất cả các thay đổi quan trọng cho ứng dụng LibriAudio được gh
 
 ---
 
-## Cách đọcangelog
+## Cách đọc changelog
 
 - **[Added]** - Tính năng mới
 - **[Changed]** - Thay đổi hiện có

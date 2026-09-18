@@ -404,9 +404,57 @@ flutter build ios --release
 - [Google Drive API](https://developers.google.com/drive/api)
 - [Text-to-Speech Guide](https://pub.dev/packages/flutter_tts)
 - [Just Audio](https://pub.dev/packages/just_audio)
+- [Katbook EPUB Reader](https://pub.dev/packages/katbook_epub_reader)
+- [Pdfrx PDF Viewer](https://pub.dev/packages/pdfrx)
 
 ---
 
-**Last Updated**: 2026-09-07
+**Last Updated**: 2026-09-18
 **Flutter Version**: >=3.0.0
 **Dart Version**: >=3.0.0
+
+## 📖 **Book Reader Screen (book_reader_screen.dart)**
+
+### Overview
+The `BookReaderScreen` provides a comprehensive reading experience for EPUB and PDF files with TTS support.
+
+### Key Features
+| Feature | Description |
+|---------|-------------|
+| EPUB Reader | Powered by `katbook_epub_reader` package |
+| PDF Reader | Powered by `pdfrx` package |
+| TTS Mode | Text-to-speech using `TtsService` |
+| Chapter Navigation | Previous/Next chapter buttons |
+| Search | Search within book content |
+| Settings | Font size, voice selection, TTS rate |
+| Share/Export | Share book info or export content |
+
+### Main Methods
+| Method | Description |
+|--------|-------------|
+| `_loadBook()` | Main entry point, loads EPUB or PDF based on file type |
+| `_loadEpub()` | Loads EPUB file, extracts text for TTS |
+| `_loadPdf()` | Loads PDF file, extracts text for TTS |
+| `_extractTextFromEpub()` | Extracts text from EPUB paragraphs |
+| `_extractTextFromPdf()` | Extracts text from PDF pages using pdfrx |
+| `_startAudioReading()` | Starts TTS with extracted content |
+| `_goToNextChapter()` / `_goToPreviousChapter()` | Navigate between chapters |
+
+### State Management
+| State Variable | Purpose |
+|----------------|---------|
+| `_book` | Current book object |
+| `_currentChapterIndex` | Current chapter position |
+| `_isAudioMode` | Audio vs reading mode toggle |
+| `_textContent` | Extracted text for TTS |
+| `_isLoading` | Loading state indicator |
+| `_error` | Error message display |
+
+### Dependencies
+- `katbook_epub_reader` - EPUB rendering and parsing
+- `pdfrx` - PDF rendering and text extraction
+- `flutter_tts` - Text-to-speech engine
+- `provider` - State management
+- `share_plus` - Share functionality
+
+---
