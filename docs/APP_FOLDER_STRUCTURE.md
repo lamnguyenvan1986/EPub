@@ -143,5 +143,33 @@ Update UI (Consumer rebuilds)
 
 ---
 
-**Last Updated**: 2026-09-15
-**Version**: 1.0.0
+**Last Updated**: 2026-09-18
+**Version**: 1.1.0
+
+---
+
+## Cấu trúc Claude Code
+
+Để Claude Code hiểu rõ cấu trúc project, file này được sử dụng:
+
+### 1. `.claude/settings.json`
+Cấu hình cho Claude Code (nếu tồn tại):
+```json
+{
+  "projectName": "LibriAudio",
+  "filePatterns": ["lib/**/*.dart"]
+}
+```
+
+### 2. `CLAUDE.md`
+Tài liệu tổng hợp cho Claude AI:
+- Mô tả project
+- Hướng dẫn phát triển
+- Quy ước code
+- Common tasks
+
+### 3. `MEMORY.md`
+Lưu trữ các facts ngắn gọn về project:
+- Code patterns đã sử dụng
+- Quyết định kiến trúc
+- Notes quan trọng

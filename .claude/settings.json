@@ -1,0 +1,27 @@
+{
+  "projectName": "LibriAudio",
+  "projectType": "flutter",
+  "filePatterns": ["lib/**/*.dart"],
+  "ignoredPatterns": ["build/**", ".dart_tool/**", "pubspec.lock"],
+  "contextFiles": [
+    "CLAUDE.md",
+    "docs/AI_CLAUDE_DOCUMENTATION.md",
+    "docs/APP_FOLDER_STRUCTURE.md",
+    "pubspec.yaml"
+  ],
+  "flutter": {
+    "entryPoint": "lib/main.dart",
+    "platforms": ["android", "ios", "web"]
+  },
+  "stateManagement": "provider",
+  "database": "hive",
+  "keyFiles": {
+    "main": "lib/main.dart",
+    "bookReader": "lib/screens/book_reader_screen.dart",
+    "ttsService": "lib/services/tts_service.dart",
+    "storageService": "lib/services/storage_service.dart",
+    "audioPlayer": "lib/services/audio_player_service.dart",
+    "driveService": "lib/services/drive_service.dart",
+    "bookProvider": "lib/providers/book_provider.dart"
+  }
+}

@@ -65,7 +65,7 @@ coverage/
 # Firebase
 firebase-debug.log
 
-# Documentation (chỉ giữ lại README)
+# Documentation
 # docs/ được giữ nguyên vì là tài liệu chính
 # Widget Preview related
 .widget_preview/
