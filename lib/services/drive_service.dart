@@ -11,22 +11,9 @@ import 'dart:io' show File;
 
 class DriveService {
   drive.DriveApi? _driveApi;
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  final GoogleSignIn _googleSignIn;
 
-  /// Whether the service has been initialized
-  bool _isInitialized = false;
-
-  DriveService() {
-    // Initialize the singleton instance with config
-    // Note: initialize must be called once and awaited before other methods
-    if (!_isInitialized) {
-      _googleSignIn.initialize(
-        clientId:
-            '577711935566-ru5fvsii1r4jrgsckg8ku22vgq48anrt.apps.googleusercontent.com',
-      );
-      _isInitialized = true;
-    }
-  }
+  DriveService() : _googleSignIn = GoogleSignIn();
 
   drive.DriveApi? get driveApi => _driveApi;
   bool get isAuthenticated => _driveApi != null;

@@ -5,13 +5,18 @@
   "ignoredPatterns": ["build/**", ".dart_tool/**", "pubspec.lock"],
   "contextFiles": [
     "CLAUDE.md",
+    "MEMORY.md",
+    "FOLDER_TREE.txt",
+    "INSTALL_RUN_GUIDE.md",
+    "docs/PROJECT_SUMMARY.md",
     "docs/AI_CLAUDE_DOCUMENTATION.md",
     "docs/APP_FOLDER_STRUCTURE.md",
+    "docs/ARCHITECTURE.md",
     "pubspec.yaml"
   ],
   "flutter": {
     "entryPoint": "lib/main.dart",
-    "platforms": ["android", "ios", "web"]
+    "platforms": ["android", "ios", "web", "linux"]
   },
   "stateManagement": "provider",
   "database": "hive",

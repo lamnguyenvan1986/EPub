@@ -6,11 +6,16 @@ import 'package:googleapis/drive/v3.dart' as drive;
 
 class BookProvider with ChangeNotifier {
   final StorageService _storage = StorageService();
-  late DriveService _drive;
+  DriveService? _drive;
 
   BookProvider() {
-    _drive = DriveService();
     _loadBooks();
+  }
+
+  // Getter lazy initializes DriveService when needed
+  DriveService get drive {
+    _drive ??= DriveService();
+    return _drive!;
   }
 
   List<Book> _books = <Book>[];

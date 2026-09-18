@@ -22,14 +22,32 @@ class TtsService extends ChangeNotifier {
   String get voice => _selectedVoice;
 
   TtsService() {
+    // Initialize voices after a short delay to ensure flutter_tts is ready
+    WidgetsFlutterBinding.ensureInitialized();
     _initTts();
   }
 
   Future<void> _initTts() async {
+    // Wait a bit for flutter_tts to initialize
+    await Future.delayed(const Duration(milliseconds: 500));
+
     // Get available voices
     final voices = await _tts.getVoices;
     if (voices != null) {
       _voices = voices.where((v) => v['locale'] != null).toList();
+      print('TTS Service: Loaded ${_voices.length} voices');
+      notifyListeners();
+    } else {
+      print('TTS Service: No voices available');
+    }
+  }
+
+  /// Force reload voices from flutter_tts
+  Future<void> reloadVoices() async {
+    final voices = await _tts.getVoices;
+    if (voices != null) {
+      _voices = voices.where((v) => v['locale'] != null).toList();
+      print('TTS Service: Reloaded ${_voices.length} voices');
       notifyListeners();
     }
   }
