@@ -71,11 +71,11 @@ Chưa chạy trên thiết bị thật; cần thử TTS và Google Drive trên A
 - #35 `ThemeProvider` chưa hỗ trợ `ThemeMode.system`.
 - #36 `AudioPlayerService` (just_audio) vẫn là code chưa dùng.
 - #38 `PlaylistProvider`/`HighlightProvider` chưa đăng ký và chưa load từ storage.
-- Test có sẵn: `features_test.dart`, `e2e_test.dart` không biên dịch do xung đột phiên bản `image`/`archive` (dependency gián tiếp). Các lỗi này đã có từ trước.
 
 ### Dọn test
 
 - Xoá `test/widget_test.dart` theo yêu cầu: không dùng, và luôn lỗi vì không mock `path_provider`.
+- Xoá `test/features_test.dart` và `test/e2e_test.dart` theo yêu cầu: không biên dịch được do xung đột phiên bản `image`/`archive`. Cập nhật README, `run_tests.sh` và docs tương ứng.
 
 ### Test mới
 
