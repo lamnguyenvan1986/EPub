@@ -87,3 +87,15 @@ Chưa kiểm tra trên thiết bị: phát nền Android/iOS (không có Android
 ### Test mới
 
 - `test/tts_split_test.dart`: kiểm tra `TtsService.splitText` (đoạn ngắn, text rỗng, đoạn dài, câu rất dài). Chạy: `flutter test test/tts_split_test.dart test/models_test.dart` → 17/17 pass.
+
+### Đợt 3 (2026-10-30): Google Drive import
+
+| # | File | Lỗi | Cách sửa |
+|---|------|-----|----------|
+| 39 | `lib/services/drive_service.dart`, `book_provider.dart` | File `.azw/.azw3` trên Drive không hiện ra (Drive gán octet-stream hoặc MIME Amazon), và nếu tải về thì màn đọc không nhận ra loại file | Gộp thành một truy vấn nhiều MIME (kèm octet-stream, MIME Amazon), lọc lại theo đuôi file; loại sách lấy theo đuôi file trước (`resolveBookMimeType`) |
+| 40 | `lib/screens/file_import_screen.dart` | Thẻ "Import from Google Drive" mở màn Drive khi chưa đăng nhập nhưng không có nút kết nối | Màn Drive hiện nút "Connect Google Drive" và lỗi kết nối; thêm nút làm mới danh sách |
+| 41 | `lib/services/drive_service.dart`, `file_import_screen.dart` | Token bị thu hồi (401) hiện lỗi thô; phiên hết hạn để lại danh sách cũ | Lỗi 401 xoá phiên và chuyển về màn kết nối; kết nối lại thì tải lại danh sách |
+
+Test mới: `test/drive_mime_test.dart` (5 case). `flutter test` → 27/27 pass.
+
+Chưa chạy được trên thiết bị: `google-services.json` và `GoogleService-Info.plist` vẫn là giá trị mẫu, cần OAuth client thật (Android + SHA-1, Web) thì mới đăng nhập Drive được.

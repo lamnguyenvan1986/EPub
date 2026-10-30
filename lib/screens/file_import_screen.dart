@@ -259,6 +259,54 @@ class GoogleDriveBooksScreen extends StatefulWidget {
 class _GoogleDriveBooksScreenState extends State<GoogleDriveBooksScreen> {
   // Giữ future để không gọi lại Drive API mỗi lần rebuild
   Future<List<drive.File>>? _filesFuture;
+  bool _isConnecting = false;
+  String? _connectError;
+
+  Future<void> _connect() async {
+    setState(() {
+      _isConnecting = true;
+      _connectError = null;
+    });
+    final success = await DriveService().authenticate();
+    if (!mounted) return;
+    setState(() {
+      _isConnecting = false;
+      _filesFuture = null;
+      if (!success) _connectError = 'Failed to connect to Google Drive';
+    });
+  }
+
+  Widget _buildConnectPrompt(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _isConnecting ? null : _connect,
+              icon: _isConnecting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.login),
+              label: const Text('Connect Google Drive'),
+            ),
+            if (_connectError != null) ...[
+              const SizedBox(height: 12),
+              Text(_connectError!, style: TextStyle(color: Colors.red.shade700)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _downloadAndImportFile(BuildContext context, drive.File file) async {
     try {
@@ -288,11 +336,22 @@ class _GoogleDriveBooksScreenState extends State<GoogleDriveBooksScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: Navigator.of(context).pop,
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: () => setState(() => _filesFuture = null),
+          ),
+        ],
       ),
       body: Consumer<DriveService>(
         builder: (context, driveService, child) {
           if (!driveService.isAuthenticated) {
-            return const Center(child: Text('Please connect Google Drive first.'));
+            // Phiên hết hạn giữa chừng: bỏ kết quả cũ để tải lại sau khi kết nối
+            _filesFuture = null;
+            return _buildConnectPrompt(
+              'Please connect Google Drive first. If you were connected before, your session may have expired.',
+            );
           }
 
           return FutureBuilder<List<drive.File>>(
@@ -324,7 +383,7 @@ class _GoogleDriveBooksScreenState extends State<GoogleDriveBooksScreen> {
                     children: const [
                       Icon(Icons.folder_open, size: 64, color: Colors.grey),
                       SizedBox(height: 16),
-                      Text('No PDF or EPUB files found in Google Drive'),
+                      Text('No PDF, EPUB or MOBI files found in Google Drive'),
                     ],
                   ),
                 );
