@@ -192,9 +192,40 @@ class TtsService extends ChangeNotifier {
     if (queue.isEmpty) return;
 
     await _stopEngine();
+    await _ensureWebVoice();
     _queue = queue;
     _currentIndex = startIndex.clamp(0, _queue.length - 1);
     await _speakCurrent();
+  }
+
+  bool _webVoiceReady = false;
+
+  /// Trình duyệt (nhất là Chrome) tải danh sách giọng bất đồng bộ, nên lúc
+  /// khởi tạo thường chưa có giọng nào và setLanguage() không chọn được giọng
+  /// Việt. Trước lần đọc đầu tiên, tải lại giọng và áp dụng lại ngôn ngữ/giọng.
+  Future<void> _ensureWebVoice() async {
+    if (!kIsWeb || _webVoiceReady) return;
+    try {
+      if (_voices.isEmpty) await reloadVoices();
+      if (_voices.isEmpty) return;
+      _webVoiceReady = true;
+
+      if (_selectedVoice.isEmpty) {
+        try {
+          _selectedVoice = StorageService().savedVoiceId ?? '';
+        } catch (e) {
+          // StorageService chưa khởi tạo
+        }
+      }
+      if (_selectedVoice.isNotEmpty && _findVoice(_selectedVoice) != null) {
+        await _applyVoice(_selectedVoice);
+      } else {
+        _selectedVoice = '';
+        await _tts.setLanguage(_language);
+      }
+    } catch (e) {
+      print('TTS web voice error: $e');
+    }
   }
 
   /// Nhảy tới đoạn [index] trong hàng đợi hiện tại.
