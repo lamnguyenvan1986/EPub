@@ -58,6 +58,11 @@ dev_dependencies:
   build_runner: ^2.4.7
   json_serializable: ^6.7.1
 
+# image 4.11.0 gọi ZLibDecoder.decodeLazy, hàm không có trong archive 4.0.x; gói pdf
+# lại giới hạn archive <4.1.0 nên build lỗi trên mọi nền tảng. Ghim image bản cũ hơn.
+dependency_overrides:
+  image: 4.10.2
+
 flutter:
   uses-material-design: true
 
@@ -65,9 +70,6 @@ flutter:
     - family: NotoSans
       fonts:
         - asset: assets/fonts/NotoSans-Regular.ttf
-    - family: NotoSansVietnamese
-      fonts:
-        - asset: assets/fonts/NotoSansVietnamese-Regular.ttf
     - family: NotoSansThai
       fonts:
         - asset: assets/fonts/NotoSansThai-Regular.ttf

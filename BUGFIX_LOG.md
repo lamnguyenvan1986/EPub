@@ -99,3 +99,14 @@ Chưa kiểm tra trên thiết bị: phát nền Android/iOS (không có Android
 Test mới: `test/drive_mime_test.dart` (5 case). `flutter test` → 27/27 pass.
 
 Chưa chạy được trên thiết bị: `google-services.json` và `GoogleService-Info.plist` vẫn là giá trị mẫu, cần OAuth client thật (Android + SHA-1, Web) thì mới đăng nhập Drive được.
+
+### Đợt 4 (2026-10-30): Chạy trên web
+
+| # | File | Lỗi | Cách sửa |
+|---|------|-----|----------|
+| 42 | `pubspec.yaml` | Repo không có `pubspec.lock`, `pub get` chọn `image 4.11.0` đi với `archive 4.0.9` (gói `pdf` giới hạn archive <4.1.0) → lỗi `decodeLazy isn't defined`, build hỏng trên mọi nền tảng | `dependency_overrides: image: 4.10.2` |
+| 43 | `assets/fonts/` | 4 file `.ttf` thực ra là trang HTML của GitHub, font NotoSans không dùng được | Thay `NotoSans-Regular.ttf`, `NotoSansThai-Regular.ttf` bằng font thật (kèm `OFL.txt`); bỏ `NotoSansVietnamese` (không có font này, NotoSans đã có tiếng Việt) và `NotoSansDevanagari` (không khai báo, không dùng) |
+| 44 | `lib/services/tts_service.dart` | Trên web, trình duyệt tải danh sách giọng chậm nên lúc khởi tạo `setLanguage('vi-VN')` không chọn được giọng, trình duyệt đọc bằng giọng mặc định (thường là tiếng Anh) | Trước lần đọc đầu tiên trên web, tải lại giọng và áp dụng lại giọng đã lưu hoặc ngôn ngữ |
+
+Kiểm tra: `flutter build web` thành công; chạy bản build trong Chromium (Playwright): nhập và đọc EPUB/PDF, nút đọc to dùng giọng `vi-VN`, sách còn sau khi tải lại trang. `flutter test` → 27/27 pass.
+Trên web: Google Drive bị tắt (chưa hỗ trợ đăng nhập), không phát nền / điều khiển màn hình khoá.
