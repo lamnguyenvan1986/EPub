@@ -19,9 +19,7 @@ dependencies:
   pdf: ^3.12.0
   # TTS & Audio (Miễn phí cho tiếng Việt)
   flutter_tts: ^4.0.2  # Hỗ trợ tiếng Việt tốt nhất (miễn phí)
-  just_audio: ^0.10.6  # Phát audio nền
-  audio_session: ^0.2.4
-  audio_service: ^0.18.13
+  audio_service: ^0.18.13  # Phát TTS nền + thông báo điều khiển
   wakelock_plus: ^1.1.3  # Tắt tự động sleep khi nghe audio
   # Persistence
   hive: ^2.2.3

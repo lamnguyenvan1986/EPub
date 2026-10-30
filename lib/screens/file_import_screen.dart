@@ -197,7 +197,7 @@ class _FileImportScreenState extends State<FileImportScreen> {
     try {
       PlatformFile? result = await FilePicker.pickFile(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'epub', 'mobi'],
+        allowedExtensions: ['pdf', 'epub', 'mobi', 'azw', 'azw3'],
       );
 
       if (result == null) {

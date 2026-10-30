@@ -21,7 +21,8 @@ lib/
 ├── services/                           # Business Logic
 │   ├── storage_service.dart
 │   ├── tts_service.dart
-│   ├── audio_player_service.dart
+│   ├── tts_audio_handler.dart
+│   ├── mobi_parser.dart
 │   ├── drive_service.dart
 │   └── firebase_service.dart
 ├── screens/                            # App Screens
@@ -47,7 +48,7 @@ lib/
 | Framework | Flutter |
 | State Management | Provider + ChangeNotifier |
 | Database | Hive + SharedPreferences |
-| Audio | just_audio + flutter_tts |
+| Audio | flutter_tts + audio_service |
 | EPUB | katbook_epub_reader |
 | PDF | pdfrx |
 | Cloud | Google Drive + Firebase |
@@ -95,7 +96,7 @@ lib/
 
 ### Audio & TTS
 - `flutter_tts` - Text-to-speech
-- `just_audio` - Audio playback
+- `audio_service` - Background playback (TTS)
 - `wakelock_plus` - Prevent sleep
 
 ### File Handling

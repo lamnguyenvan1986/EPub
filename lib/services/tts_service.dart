@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:libri_audio/services/storage_service.dart';
@@ -32,6 +33,17 @@ class TtsService extends ChangeNotifier {
   /// Gọi khi đã đọc hết hàng đợi.
   VoidCallback? onQueueCompleted;
 
+  /// Chuyển chương/trang tiếp theo hoặc trước đó (màn đọc sách gán vào).
+  /// Nút trên thông báo và tai nghe dùng các callback này.
+  Future<void> Function()? onSkipNext;
+  Future<void> Function()? onSkipPrevious;
+
+  // Thông tin hiển thị trên thông báo / màn hình khoá
+  String? _nowPlayingTitle;
+  String? _nowPlayingSubtitle;
+  String? get nowPlayingTitle => _nowPlayingTitle;
+  String? get nowPlayingSubtitle => _nowPlayingSubtitle;
+
   List<String> get languages => _languages;
   List<Map<String, dynamic>> get voices => _voices;
   bool get isSpeaking => _isSpeaking;
@@ -62,6 +74,19 @@ class TtsService extends ChangeNotifier {
       // speak() trả về ngay; việc đọc nối tiếp do completion handler đảm nhận
       await _tts.awaitSpeakCompletion(false);
 
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        // Category playback để tiếp tục đọc khi khoá màn hình / tắt tiếng
+        await _tts.setSharedInstance(true);
+        await _tts.setIosAudioCategory(
+          IosTextToSpeechAudioCategory.playback,
+          [
+            IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+            IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+          ],
+          IosTextToSpeechAudioMode.spokenAudio,
+        );
+      }
+
       // Khôi phục cài đặt đã lưu
       try {
         final storage = StorageService();
@@ -73,7 +98,7 @@ class TtsService extends ChangeNotifier {
       }
 
       await _tts.setLanguage(_language);
-      await _tts.setSpeechRate(_rate);
+      await _tts.setSpeechRate(_engineRate(_rate));
       await _tts.setPitch(_pitch);
 
       final voices = await _tts.getVoices;
@@ -119,7 +144,7 @@ class TtsService extends ChangeNotifier {
 
   Future<void> setRate(double rate) async {
     _rate = rate.clamp(0.5, 2.0);
-    await _tts.setSpeechRate(_rate);
+    await _tts.setSpeechRate(_engineRate(_rate));
     _saveSetting(() => StorageService().saveReadingSpeed(_rate));
     notifyListeners();
   }
@@ -129,6 +154,30 @@ class TtsService extends ChangeNotifier {
     await _tts.setPitch(_pitch);
     _saveSetting(() => StorageService().savePitch(_pitch));
     notifyListeners();
+  }
+
+  /// Đổi hệ số tốc độ của app (1.0 = bình thường) sang giá trị của flutter_tts.
+  /// flutter_tts nhân đôi rate trên Android, còn iOS/macOS dùng 0.5 là bình thường
+  /// và 1.0 là tối đa, nên cả hai cùng dùng rate * 0.5. Web dùng nguyên giá trị.
+  static double _engineRate(double rate) => kIsWeb ? rate : rate * 0.5;
+
+  /// Cập nhật tiêu đề hiển thị trên thông báo / màn hình khoá.
+  void setNowPlaying(String? title, {String? subtitle}) {
+    if (_nowPlayingTitle == title && _nowPlayingSubtitle == subtitle) return;
+    _nowPlayingTitle = title;
+    _nowPlayingSubtitle = subtitle;
+    notifyListeners();
+  }
+
+  /// Chuyển tiếp: theo chương/trang nếu màn đọc có gán, không thì sang đoạn sau.
+  Future<void> skipNext() async {
+    if (onSkipNext != null) return onSkipNext!();
+    if (_queue.isNotEmpty) await jumpTo(_currentIndex + 1);
+  }
+
+  Future<void> skipPrevious() async {
+    if (onSkipPrevious != null) return onSkipPrevious!();
+    if (_queue.isNotEmpty) await jumpTo(_currentIndex - 1);
   }
 
   /// Đọc một đoạn text bất kỳ (tự chia nhỏ nếu dài).
@@ -202,6 +251,8 @@ class TtsService extends ChangeNotifier {
     await _stopEngine();
     _queue = [];
     _currentIndex = 0;
+    _nowPlayingTitle = null;
+    _nowPlayingSubtitle = null;
     notifyListeners();
   }
 

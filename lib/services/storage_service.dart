@@ -116,6 +116,17 @@ class StorageService {
   bool get darkMode => _prefs.getBool('dark_mode') ?? false;
   Future<void> saveDarkMode(bool enabled) => _prefs.setBool('dark_mode', enabled);
 
+  /// 'system', 'light' hoặc 'dark'. Null nếu người dùng chưa chọn.
+  String? get themeMode {
+    final mode = _prefs.getString('theme_mode');
+    if (mode != null) return mode;
+    // Bản cũ chỉ lưu dark_mode
+    if (_prefs.containsKey('dark_mode')) return darkMode ? 'dark' : 'light';
+    return null;
+  }
+
+  Future<void> saveThemeMode(String mode) => _prefs.setString('theme_mode', mode);
+
   String get lastDir => _prefs.getString('last_dir') ?? '';
   Future<void> saveLastDir(String path) => _prefs.setString('last_dir', path);
 

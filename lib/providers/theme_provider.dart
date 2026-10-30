@@ -1,50 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:libri_audio/services/storage_service.dart';
 
-class ThemeProvider with ChangeNotifier {
+class ThemeProvider with ChangeNotifier, WidgetsBindingObserver {
   final StorageService _storage = StorageService();
-  
+
   ThemeMode _themeMode = ThemeMode.system;
-  
+
   ThemeMode get themeMode => _themeMode;
-  bool get isDarkMode => _themeMode == ThemeMode.dark;
-  
-  ThemeProvider() {
-    // Load saved theme
-    final darkMode = _storage.darkMode;
-    _themeMode = darkMode ? ThemeMode.dark : ThemeMode.light;
+
+  /// Theme đang hiển thị là tối (tính cả khi theo hệ thống).
+  bool get isDarkMode {
+    if (_themeMode == ThemeMode.system) {
+      return WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+    }
+    return _themeMode == ThemeMode.dark;
   }
-  
+
+  ThemeProvider() {
+    // Load saved theme; mặc định theo hệ thống
+    _themeMode = switch (_storage.themeMode) {
+      'dark' => ThemeMode.dark,
+      'light' => ThemeMode.light,
+      _ => ThemeMode.system,
+    };
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    // Cập nhật icon/switch khi hệ thống đổi sáng/tối
+    if (_themeMode == ThemeMode.system) notifyListeners();
+  }
+
   void setThemeMode(ThemeMode mode) {
     _themeMode = mode;
-    
-    // Save to preferences
-    _storage.saveDarkMode(mode == ThemeMode.dark);
-    
+    _storage.saveThemeMode(mode.name);
     notifyListeners();
   }
-  
+
+  /// Đổi giữa sáng và tối dựa trên theme đang hiển thị.
   void toggleTheme() {
-    final newMode = _themeMode == ThemeMode.light 
-      ? ThemeMode.dark 
-      : ThemeMode.light;
-    _themeMode = newMode;
-    
-    // Save to preferences
-    _storage.saveDarkMode(newMode == ThemeMode.dark);
-    
-    notifyListeners();
+    setThemeMode(isDarkMode ? ThemeMode.light : ThemeMode.dark);
   }
-  
-  void setLightMode() {
-    _themeMode = ThemeMode.light;
-    _storage.saveDarkMode(false);
-    notifyListeners();
-  }
-  
-  void setDarkMode() {
-    _themeMode = ThemeMode.dark;
-    _storage.saveDarkMode(true);
-    notifyListeners();
+
+  void setLightMode() => setThemeMode(ThemeMode.light);
+
+  void setDarkMode() => setThemeMode(ThemeMode.dark);
+
+  void setSystemMode() => setThemeMode(ThemeMode.system);
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 }

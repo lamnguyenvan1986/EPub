@@ -246,7 +246,7 @@ class DriveService extends ChangeNotifier {
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['epub', 'pdf', 'mobi'],
+        allowedExtensions: ['epub', 'pdf', 'mobi', 'azw', 'azw3'],
       );
 
       if (result.isEmpty) {
@@ -282,7 +282,7 @@ class DriveService extends ChangeNotifier {
   Future<String?> _pickFileFromDeviceMobile() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['epub', 'pdf', 'mobi'],
+      allowedExtensions: ['epub', 'pdf', 'mobi', 'azw', 'azw3'],
     );
 
     if (result.isEmpty) {
@@ -317,6 +317,8 @@ class DriveService extends ChangeNotifier {
       case '.pdf':
         return 'application/pdf';
       case '.mobi':
+      case '.azw':
+      case '.azw3':
         return 'application/x-mobipocket-ebook';
       default:
         // Try to infer from path content for web fake paths

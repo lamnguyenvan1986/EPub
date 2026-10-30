@@ -177,6 +177,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Theo hệ thống'),
+                  Switch(
+                    value: context.watch<ThemeProvider>().themeMode == ThemeMode.system,
+                    onChanged: (followSystem) {
+                      final theme = context.read<ThemeProvider>();
+                      if (followSystem) {
+                        theme.setSystemMode();
+                      } else {
+                        theme.setThemeMode(theme.isDarkMode ? ThemeMode.dark : ThemeMode.light);
+                      }
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
