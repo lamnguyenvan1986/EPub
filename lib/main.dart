@@ -25,13 +25,39 @@ void main() async {
   // Initialize services
   try {
     await StorageService().init();
-    // DriveService is initialized lazily when needed
   } catch (e) {
+    // Các provider đều cần StorageService; chạy tiếp sẽ crash với LateInitializationError
     print('Error initializing storage: $e');
+    runApp(StartupErrorApp(message: e.toString()));
+    return;
   }
 
   // Run the app
   runApp(const MyApp());
+}
+
+class StartupErrorApp extends StatelessWidget {
+  final String message;
+
+  const StartupErrorApp({super.key, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Không khởi tạo được bộ nhớ của ứng dụng.\n\n$message',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -45,7 +71,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => TtsService()),
         ChangeNotifierProvider(create: (_) => AudioPlayerService()),
-        Provider(create: (_) => DriveService()),
+        // Singleton: cùng instance với FileImportScreen và BookProvider
+        ChangeNotifierProvider.value(value: DriveService()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {

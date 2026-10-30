@@ -197,13 +197,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 divisions: 15,
                 onChanged: (double value) => context.read<TtsService>().setRate(value),
               ),
-              Slider(
-                value: context.watch<TtsService>().rate,
-                min: 0.5,
-                max: 2.0,
-                divisions: 15,
-                onChanged: (double value) => context.read<TtsService>().setRate(value),
-              ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -212,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Consumer<TtsService>(
                     builder: (context, tts, child) {
                       final voice = tts.voice;
-                      return Text(voice);
+                      return Text(voice.isEmpty ? 'Mặc định' : voice);
                     },
                   ),
                 ],

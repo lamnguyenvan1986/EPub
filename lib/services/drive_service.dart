@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show ChangeNotifier, kIsWeb;
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:google_sign_in/google_sign_in.dart';
@@ -7,13 +7,25 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:libri_audio/services/storage_service.dart';
-import 'dart:io' show File;
+import 'dart:io' show File, Directory;
 
-class DriveService {
+/// Singleton: mọi màn hình và BookProvider dùng chung một phiên đăng nhập Drive.
+class DriveService extends ChangeNotifier {
+  static final DriveService _instance = DriveService._internal();
+  factory DriveService() => _instance;
+  DriveService._internal();
+
+  static const List<String> _scopes = [
+    drive.DriveApi.driveFileScope,
+    drive.DriveApi.driveReadonlyScope,
+  ];
+
   drive.DriveApi? _driveApi;
-  final GoogleSignIn _googleSignIn;
+  GoogleSignInAccount? _account;
+  DateTime? _tokenExpiry;
+  Future<void>? _initFuture;
 
-  DriveService() : _googleSignIn = GoogleSignIn();
+  GoogleSignIn get _googleSignIn => GoogleSignIn.instance;
 
   drive.DriveApi? get driveApi => _driveApi;
   bool get isAuthenticated => _driveApi != null;
@@ -23,14 +35,20 @@ class DriveService {
   /// Also not supported on Linux - use file picker instead
   bool get isGoogleSignInSupported => !kIsWeb;
 
+  /// google_sign_in 7.x yêu cầu gọi initialize() đúng một lần trước khi dùng.
+  Future<void> _ensureInitialized() {
+    return _initFuture ??= _googleSignIn.initialize();
+  }
+
   Future<GoogleSignInAccount?> signIn() async {
     if (kIsWeb) {
       print('Google Sign-In is not supported on web. Use Google Identity Services instead.');
       return null;
     }
     try {
-      final account = await _googleSignIn.authenticate();
-      return account;
+      await _ensureInitialized();
+      _account = await _googleSignIn.authenticate();
+      return _account;
     } catch (error) {
       print('Error signing in: $error');
       return null;
@@ -38,18 +56,16 @@ class DriveService {
   }
 
   Future<void> signOut() async {
+    await _ensureInitialized();
     await _googleSignIn.signOut();
     _driveApi = null;
+    _account = null;
+    _tokenExpiry = null;
+    notifyListeners();
   }
 
   /// Get the current signed-in account
-  /// In google_sign_in 7.x, there's no currentUser getter.
-  /// You need to track this yourself or use authenticationEvents stream.
-  Future<GoogleSignInAccount?> getCurrentUser() async {
-    // The new API doesn't expose a simple way to get the current user.
-    // Users should store the account after successful authentication.
-    return null;
-  }
+  Future<GoogleSignInAccount?> getCurrentUser() async => _account;
 
   Future<bool> authenticate() async {
     if (kIsWeb) {
@@ -61,31 +77,13 @@ class DriveService {
       // Check if already authenticated
       if (_driveApi != null) return true;
 
-      final account = await _googleSignIn.authenticate();
+      await _ensureInitialized();
+      _account = await _googleSignIn.authenticate();
 
       // Get access token for Drive API using authorizationClient
-      final authz = await account.authorizationClient.authorizeScopes([
-        drive.DriveApi.driveFileScope,
-        drive.DriveApi.driveReadonlyScope,
-      ]);
-      // Note: authorizeScopes throws on failure, so authz is guaranteed non-null here
-
-      // In googleapis_auth 2.x, AccessToken takes 3 params: type, data, expiry
-      final accessToken = auth.AccessToken(
-        'Bearer',
-        authz.accessToken,
-        DateTime.now().add(const Duration(hours: 1)),
-      );
-      // AccessCredentials order: accessToken, refreshToken, scopes
-      final credentials = auth.AccessCredentials(
-        accessToken,
-        null, // No refresh token available from google_sign_in
-        [drive.DriveApi.driveFileScope, drive.DriveApi.driveReadonlyScope],
-      );
-
-      // authenticatedClient takes baseClient and credentials
-      final client = auth.authenticatedClient(http.Client(), credentials);
-      _driveApi = drive.DriveApi(client);
+      final authz = await _account!.authorizationClient.authorizeScopes(_scopes);
+      _setAccessToken(authz.accessToken);
+      notifyListeners();
       return true;
     } catch (error) {
       print('Error authenticating: $error');
@@ -93,27 +91,68 @@ class DriveService {
     }
   }
 
-  void dispose() {
-    _driveApi = null;
+  void _setAccessToken(String token) {
+    // google_sign_in không trả refresh token; access token sống khoảng 1 giờ.
+    _tokenExpiry = DateTime.now().add(const Duration(minutes: 55));
+    final credentials = auth.AccessCredentials(
+      auth.AccessToken('Bearer', token, _tokenExpiry!.toUtc()),
+      null,
+      _scopes,
+    );
+    final client = auth.authenticatedClient(http.Client(), credentials);
+    _driveApi = drive.DriveApi(client);
+  }
+
+  /// Lấy lại access token (không cần UI) khi token sắp hết hạn.
+  Future<bool> _ensureFreshToken() async {
+    if (_driveApi == null) return false;
+    final expiry = _tokenExpiry;
+    if (expiry != null && DateTime.now().isBefore(expiry)) return true;
+
+    try {
+      final authz = await _account?.authorizationClient.authorizationForScopes(_scopes);
+      if (authz == null) {
+        // Cần người dùng đăng nhập lại
+        _driveApi = null;
+        notifyListeners();
+        return false;
+      }
+      _setAccessToken(authz.accessToken);
+      return true;
+    } catch (e) {
+      print('Error refreshing Drive token: $e');
+      _driveApi = null;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<List<drive.File>> listFiles({String? mimeType}) async {
-    if (_driveApi == null) {
+    if (!await _ensureFreshToken()) {
       return [];
     }
 
-    try {
+    final query = [
+      'trashed = false',
+      if (mimeType != null) "mimeType = '$mimeType'",
+    ].join(' and ');
+
+    final files = <drive.File>[];
+    String? pageToken;
+    do {
       final fileList = await _driveApi!.files.list(
-        q: mimeType != null ? "mimeType='$mimeType'" : null,
+        q: query,
         orderBy: 'modifiedTime desc',
         spaces: 'drive',
+        pageSize: 100,
+        pageToken: pageToken,
+        $fields: 'nextPageToken, files(id, name, mimeType, modifiedTime)',
       );
+      files.addAll(fileList.files ?? []);
+      pageToken = fileList.nextPageToken;
+    } while (pageToken != null);
 
-      return fileList.files ?? [];
-    } catch (e) {
-      print('Error listing files: $e');
-      return [];
-    }
+    return files;
   }
 
   Future<List<drive.File>> listPdfAndEpubFiles() async {
@@ -128,7 +167,7 @@ class DriveService {
   /// On web, returns a fake path; bytes are stored in Hive with bookId
   /// On mobile/desktop, returns the actual file path
   Future<String?> downloadFile(drive.File file, String? bookId) async {
-    if (_driveApi == null) {
+    if (!await _ensureFreshToken()) {
       return null;
     }
 
@@ -151,10 +190,12 @@ class DriveService {
         // Return a fake path for web (will use fileBytes instead)
         return file.name;
       } else {
-        // Save to local storage on mobile/desktop
+        // Mỗi file Drive một thư mục riêng theo id để tránh ghi đè file trùng tên
         final dir = await getApplicationDocumentsDirectory();
+        final bookDir = Directory(p.join(dir.path, 'books', 'drive_${file.id}'));
+        await bookDir.create(recursive: true);
         final filename = file.name ?? 'file_${file.id}';
-        final filePath = p.join(dir.path, filename);
+        final filePath = p.join(bookDir.path, filename);
 
         final fileObj = File(filePath);
         await fileObj.writeAsBytes(buffer);

@@ -15,23 +15,31 @@ class VoiceSelector extends StatelessWidget {
           return const Text('No voices available');
         }
         
+        // Mỗi value chỉ xuất hiện một lần, và value đang chọn phải có trong danh sách,
+        // nếu không DropdownButton sẽ assert.
+        final seen = <String>{};
+        final items = <DropdownMenuItem<String>>[];
+        for (final voice in voices) {
+          final voiceName = voice['name']?.toString();
+          if (voiceName == null || !seen.add(voiceName)) continue;
+          items.add(DropdownMenuItem<String>(
+            value: voiceName,
+            child: Text('$voiceName (${voice['locale'] ?? 'Unknown'})'),
+          ));
+        }
+        final selected = seen.contains(ttsService.voice) ? ttsService.voice : null;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Select Voice:'),
             const SizedBox(height: 8),
             DropdownButton<String>(
-              value: ttsService.voice,
+              value: selected,
+              hint: const Text('Giọng mặc định'),
+              isExpanded: true,
               dropdownColor: Theme.of(context).cardColor,
-              items: voices.map((voice) {
-                final voiceName = voice['name'] ?? voice['locale'] as String?;
-                return DropdownMenuItem<String>(
-                  value: voiceName,
-                  child: Text(
-                    '${voice['name'] ?? 'Unknown'} (${voice['locale'] ?? 'Unknown'})',
-                  ),
-                );
-              }).toList(),
+              items: items,
               onChanged: (value) {
                 if (value != null) {
                   ttsService.setVoice(value);
