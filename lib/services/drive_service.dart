@@ -127,40 +127,87 @@ class DriveService extends ChangeNotifier {
     }
   }
 
-  Future<List<drive.File>> listFiles({String? mimeType}) async {
+  /// MIME type Drive có thể gán cho sách. File .azw/.azw3 thường bị Drive
+  /// lưu là octet-stream hoặc MIME của Amazon nên phải lọc lại theo đuôi file.
+  static const List<String> _bookMimeTypes = [
+    'application/pdf',
+    'application/epub+zip',
+    'application/x-mobipocket-ebook',
+    'application/vnd.amazon.ebook',
+    'application/vnd.amazon.mobi8-ebook',
+    'application/octet-stream',
+  ];
+
+  static const List<String> _bookExtensions = ['.pdf', '.epub', '.mobi', '.azw', '.azw3'];
+
+  static bool isBookFileName(String name) {
+    final lower = name.toLowerCase();
+    return _bookExtensions.any(lower.endsWith);
+  }
+
+  /// Loại file dùng để mở sách: ưu tiên theo đuôi file, vì MIME trên Drive
+  /// có thể là octet-stream mà màn đọc không nhận ra.
+  static String resolveBookMimeType(String? name, String? driveMimeType) {
+    final byName = getMimeType(name ?? '');
+    if (byName != 'application/octet-stream') return byName;
+    return driveMimeType ?? 'application/octet-stream';
+  }
+
+  Future<List<drive.File>> listFiles({List<String>? mimeTypes}) async {
     if (!await _ensureFreshToken()) {
       return [];
     }
 
     final query = [
       'trashed = false',
-      if (mimeType != null) "mimeType = '$mimeType'",
+      if (mimeTypes != null && mimeTypes.isNotEmpty)
+        '(${mimeTypes.map((m) => "mimeType = '$m'").join(' or ')})',
     ].join(' and ');
 
     final files = <drive.File>[];
     String? pageToken;
-    do {
-      final fileList = await _driveApi!.files.list(
-        q: query,
-        orderBy: 'modifiedTime desc',
-        spaces: 'drive',
-        pageSize: 100,
-        pageToken: pageToken,
-        $fields: 'nextPageToken, files(id, name, mimeType, modifiedTime)',
-      );
-      files.addAll(fileList.files ?? []);
-      pageToken = fileList.nextPageToken;
-    } while (pageToken != null);
+    try {
+      do {
+        final fileList = await _driveApi!.files.list(
+          q: query,
+          orderBy: 'modifiedTime desc',
+          spaces: 'drive',
+          pageSize: 100,
+          pageToken: pageToken,
+          $fields: 'nextPageToken, files(id, name, mimeType, modifiedTime)',
+        );
+        files.addAll(fileList.files ?? []);
+        pageToken = fileList.nextPageToken;
+      } while (pageToken != null);
+    } on drive.DetailedApiRequestError catch (e) {
+      // Token bị thu hồi hoặc hết hạn sớm: yêu cầu đăng nhập lại
+      if (e.status == 401) {
+        _clearSession();
+        return [];
+      }
+      rethrow;
+    }
 
     return files;
   }
 
   Future<List<drive.File>> listPdfAndEpubFiles() async {
-    final pdfFiles = await listFiles(mimeType: 'application/pdf');
-    final epubFiles = await listFiles(mimeType: 'application/epub+zip');
-    final mobiFiles = await listFiles(mimeType: 'application/x-mobipocket-ebook');
+    final files = await listFiles(mimeTypes: _bookMimeTypes);
+    return files.where((f) {
+      final mime = f.mimeType;
+      if (mime == 'application/pdf' ||
+          mime == 'application/epub+zip' ||
+          mime == 'application/x-mobipocket-ebook') {
+        return true;
+      }
+      return isBookFileName(f.name ?? '');
+    }).toList();
+  }
 
-    return [...pdfFiles, ...epubFiles, ...mobiFiles];
+  void _clearSession() {
+    _driveApi = null;
+    _tokenExpiry = null;
+    notifyListeners();
   }
 
   /// Download file and return the file path/identifier

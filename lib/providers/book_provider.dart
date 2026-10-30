@@ -93,7 +93,7 @@ class BookProvider with ChangeNotifier {
       await _addOrUpdateBook(
         title: file.name ?? 'unknown',
         filePath: file.name ?? '',
-        fileType: file.mimeType ?? 'application/octet-stream',
+        fileType: DriveService.resolveBookMimeType(file.name, file.mimeType),
         author: 'Unknown',
         fromDrive: true,
         driveFile: file,
