@@ -2,6 +2,21 @@
 
 Tất cả các thay đổi quan trọng cho ứng dụng LibriAudio được ghi lại ở đây.
 
+## [1.1.1] - 2026-10-30
+### ✨ Thêm mới
+- Đọc và nghe sách MOBI/AZW (bộ đọc MOBI tự viết, hỗ trợ nén PalmDOC)
+- Phát TTS nền với thông báo điều khiển, nút tai nghe và màn hình khoá
+- Theme theo chế độ sáng/tối của hệ thống
+
+### 🐛 Bug fixes
+- Tốc độ đọc đúng trên Android và iOS
+- Playlist/Highlight được đăng ký và load từ bộ nhớ; bỏ AudioPlayerService không dùng
+- Sửa lỗi biên dịch (BookProvider, GoogleSignIn 7.x, assets không tồn tại)
+- Sửa crash khi lưu tiến độ đọc, khi chia sẻ sách và ở dropdown chọn giọng
+- TTS đọc theo từng đoạn (vượt giới hạn độ dài của Android), đọc tiếp đúng vị trí, chuyển chương, dừng khi thoát màn hình, nghe được PDF
+- Google Drive dùng chung một phiên đăng nhập, tự lấy lại token, không ghi đè file trùng tên
+- Chi tiết: xem [BUGFIX_LOG.md](BUGFIX_LOG.md)
+
 ## [1.1.0] - 2026-09-18
 ### ✨ Thêm mới
 - Cải thiện xử lý lỗi khi đọc file EPUB và PDF

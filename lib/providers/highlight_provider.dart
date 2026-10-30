@@ -17,8 +17,8 @@ class HighlightProvider with ChangeNotifier {
   }
   
   Future<void> _loadHighlights() async {
-    // TODO: Load highlights from storage/Firebase
-    _highlights = _highlights.where((h) => h.bookId == _currentBookId).toList();
+    final bookId = _currentBookId;
+    _highlights = bookId == null ? [] : _storage.getHighlights(bookId);
     notifyListeners();
   }
   

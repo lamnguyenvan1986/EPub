@@ -15,7 +15,9 @@ class PlaylistProvider with ChangeNotifier {
   }
   
   Future<void> _loadPlaylists() async {
-    // TODO: Load playlists from storage
+    _playlists
+      ..clear()
+      ..addAll(_storage.getPlaylists());
     notifyListeners();
   }
   

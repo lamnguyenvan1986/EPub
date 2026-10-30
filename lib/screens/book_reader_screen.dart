@@ -1,11 +1,11 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
+import 'package:flutter/foundation.dart' show compute, kIsWeb, Uint8List;
 import 'package:katbook_epub_reader/katbook_epub_reader.dart';
 import 'package:provider/provider.dart';
 import 'package:libri_audio/models/book_model.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:libri_audio/services/mobi_parser.dart';
 import 'package:libri_audio/services/tts_service.dart';
 import 'package:libri_audio/services/storage_service.dart';
 import 'package:libri_audio/widgets/voice_selector.dart';
@@ -14,22 +14,17 @@ import 'package:libri_audio/providers/book_provider.dart' show BookProvider;
 import 'package:libri_audio/widgets/pdf_viewer.dart' as pdf_widgets;
 import 'package:pdfrx/pdfrx.dart';
 
-/// Screen hiển thị nội dung sách với hỗ trợ EPUB, PDF và Text-to-Speech.
-///
-/// Tính năng:
-/// - Đọc sách EPUB với katbook_epub_reader
-/// - Đọc sách PDF với pdfrx
-/// - Chế độ nghe audio với TTS
-/// - Chuyển đổi chương, tìm kiếm, cài đặt
-/// - Chia sẻ và xuất file
-class BookReaderScreen extends StatefulWidget {
-  final Book book;
-  final bool autoPlay;
-  
-  const BookReaderScreen({super.key, required this.book, this.autoPlay = false});
+/// Một đoạn văn bản trong hàng đợi TTS, kèm vị trí trong sách.
+class _TtsSegment {
+  final String text;
 
-  @override
-  State<BookReaderScreen> createState() => _BookReaderScreenState();
+  /// Chương (EPUB: chỉ số trong flatChapters, MOBI: chỉ số chương) hoặc trang (PDF).
+  final int section;
+
+  /// Chỉ số paragraph: toàn sách với EPUB, trong chương với MOBI, PDF luôn là 0.
+  final int paragraphIndex;
+
+  const _TtsSegment(this.text, this.section, this.paragraphIndex);
 }
 
 /// Screen hiển thị nội dung sách với hỗ trợ EPUB, PDF và Text-to-Speech.
@@ -37,269 +32,266 @@ class BookReaderScreen extends StatefulWidget {
 /// Tính năng:
 /// - Đọc sách EPUB với katbook_epub_reader
 /// - Đọc sách PDF với pdfrx
+/// - Đọc sách MOBI/AZW với MobiParser
 /// - Chế độ nghe audio với TTS
 /// - Chuyển đổi chương, tìm kiếm, cài đặt
 /// - Chia sẻ và xuất file
+class BookReaderScreen extends StatefulWidget {
+  final Book book;
+  final bool autoPlay;
+
+  const BookReaderScreen({super.key, required this.book, this.autoPlay = false});
+
+  @override
+  State<BookReaderScreen> createState() => _BookReaderScreenState();
+}
+
 class _BookReaderScreenState extends State<BookReaderScreen> {
+  /// Gộp các paragraph ngắn liền nhau tới độ dài này để giảm khoảng lặng giữa các lần đọc.
+  static const int MERGE_SEGMENT_LENGTH = 1000;
+
   late Book _book;
+  late final TtsService _tts;
   int _currentChapterIndex = 0;
+  int _currentParagraphIndex = 0;
   bool _isAudioMode = false;
   String? _textContent;
   bool _isLoading = true;
   String? _error;
-  final TextEditingController _searchController = TextEditingController();
+
+  // Hàng đợi TTS của sách này (tạo khi bắt đầu nghe)
+  List<_TtsSegment>? _segments;
+  bool _isPreparingAudio = false;
+  bool _audioStarted = false;
 
   // EPUB specific
   KatbookEpubController? _epubController;
-  Uint8List? _epubBytes;
+  final GlobalKey<KatbookEpubReaderState> _readerKey = GlobalKey<KatbookEpubReaderState>();
 
   // PDF specific
   Uint8List? _pdfBytes;
+
+  // MOBI specific
+  MobiBook? _mobiBook;
+
+  bool get _isPdf => _book.fileType.contains('pdf');
+  bool get _isMobi => _book.fileType.contains('mobipocket');
 
   @override
   void initState() {
     super.initState();
     _book = widget.book;
+    _tts = context.read<TtsService>();
     _loadBook();
-
-    // Auto-play from last position
-    if (widget.autoPlay && _book.lastRead != null) {
-      _startAudioReading();
-    }
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    // Dừng đọc khi rời màn hình
+    _tts.onChunkStarted = null;
+    _tts.onQueueCompleted = null;
+    _tts.onSkipNext = null;
+    _tts.onSkipPrevious = null;
+    if (_audioStarted) {
+      _tts.stop();
+    }
+    _epubController?.dispose();
     super.dispose();
   }
 
   Future<void> _loadBook() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       // Load saved reading state
       final savedState = StorageService().getReadingState(_book.id);
       if (savedState != null) {
         _currentChapterIndex = savedState.chapterIndex;
+        _currentParagraphIndex = savedState.position;
       }
-      
+
       if (_book.fileType.contains('epub')) {
         await _loadEpub();
-      } else if (_book.fileType.contains('pdf')) {
+      } else if (_isPdf) {
         await _loadPdf();
-        // _isAudioMode = false; // PDF không hỗ trợ TTS tốt
+      } else if (_isMobi) {
+        await _loadMobi();
       } else {
         throw Exception('Định dạng file không được hỗ trợ: ${_book.fileType}');
       }
-      
+
+      if (!mounted) return;
       setState(() => _isLoading = false);
-    } on Exception catch (e, stackTrace) {
+
+      // Auto-play from last position
+      if (widget.autoPlay) {
+        _enterAudioMode();
+      }
+    } catch (e, stackTrace) {
+      print('BookReader Error: $e\n$stackTrace');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _error = 'Lỗi khi đọc file: ${e.toString()}';
       });
-
-      // Log error
-      print('BookReader Error: $stackTrace');
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _error = 'Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.';
-      });
     }
+  }
+
+  /// Đọc bytes của file sách: web lấy từ Hive, mobile/desktop đọc từ đường dẫn.
+  Future<Uint8List> _readBookBytes() async {
+    final storage = StorageService();
+    if (kIsWeb) {
+      // Bytes lưu theo id sách; bản cũ có thể lưu theo tên file
+      final bytes = storage.getBookFileBytes(_book.id) ??
+          storage.getBookFileBytes(_book.filePath ?? '');
+      if (bytes == null) {
+        throw Exception('Không tìm thấy dữ liệu file');
+      }
+      return Uint8List.fromList(bytes);
+    }
+
+    final path = _book.filePath;
+    if (path == null || path.isEmpty) {
+      throw Exception('Không tìm thấy file');
+    }
+    final file = File(path);
+    if (!await file.exists()) {
+      throw Exception('File không tồn tại: $path');
+    }
+    return file.readAsBytes();
   }
 
   Future<void> _loadEpub() async {
-    try {
-      if (_book.filePath == null) {
-        setState(() {
-          _error = 'Không tìm thấy file EPUB';
-        });
-        return;
-      }
+    final bytes = await _readBookBytes();
 
-      // Get file bytes from storage
-      final storage = StorageService();
-      final bytes = storage.getBookFileBytes(_book.id);
-
-      if (bytes == null) {
-        // Try to read from file path directly
-        try {
-          final file = File(_book.filePath!);
-          _epubBytes = await file.readAsBytes();
-        } catch (e) {
-          print('Error reading file: $e');
-          throw Exception('Không thể đọc file EPUB');
-        }
-      } else {
-        _epubBytes = Uint8List.fromList(bytes);
-      }
-
-      // Parse EPUB book
-      try {
-        _epubController = KatbookEpubController();
-        final success = await _epubController!.openBook(_epubBytes!);
-        if (!success) {
-          throw Exception('Không thể đọc file EPUB');
-        }
-
-        // Extract text from all chapters for TTS
-        _textContent = await _extractTextFromEpub();
-      } catch (e) {
-        print('Error parsing EPUB: $e');
-        throw Exception('Không thể đọc file EPUB');
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading EPUB: $e');
-      setState(() {
-        _isLoading = false;
-        _error = 'Lỗi khi đọc file EPUB: ${e.toString()}';
-      });
+    final controller = KatbookEpubController();
+    final success = await controller.openBook(bytes);
+    if (!success) {
+      controller.dispose();
+      throw Exception('Không thể đọc file EPUB');
     }
-  }
+    _epubController = controller;
 
-  /// Extract text content from all EPUB chapters for TTS.
-  ///
-  /// Duyệt qua tất cả các paragraph trong EPUB và nối lại thành một chuỗi.
-  Future<String> _extractTextFromEpub() async {
-    try {
-      final paragraphs = _epubController?.paragraphs ?? [];
-      if (paragraphs.isEmpty) {
-        return '';
-      }
-
-      final buffer = StringBuffer();
-
-      // Duyệt qua từng paragraph và trích xuất text
-      for (final paragraph in paragraphs) {
-        final text = paragraph.text.trim();
-        if (text.isNotEmpty) {
-          buffer.write(text);
-          buffer.write(' ');
-        }
-      }
-
-      return buffer.toString();
-    } catch (e) {
-      print('Error extracting text from EPUB: $e');
-      return '';
+    final chapterCount = controller.flatChapters.length;
+    if (_currentChapterIndex >= chapterCount) {
+      _currentChapterIndex = 0;
+      _currentParagraphIndex = 0;
     }
+    if (_currentParagraphIndex >= controller.totalParagraphs) {
+      _currentParagraphIndex = 0;
+    }
+    // Vị trí cũ chỉ lưu chương: mở tại đầu chương đó
+    if (_currentParagraphIndex == 0 && _currentChapterIndex > 0) {
+      _currentParagraphIndex = controller.flatChapters[_currentChapterIndex].startIndex;
+    }
+
+    // Text đầy đủ cho tìm kiếm, mỗi paragraph một dòng
+    _textContent = controller.paragraphs
+        .map((p) => p.text.trim())
+        .where((t) => t.isNotEmpty)
+        .join('\n');
   }
 
   Future<void> _loadPdf() async {
-    try {
-      if (kIsWeb) {
-        // On web, get PDF bytes from storage (filePath doesn't exist in browser)
-        // Key is filePath (file name from Drive) not bookId
-        final storage = StorageService();
-        final bytes = storage.getBookFileBytes(_book.filePath ?? '');
-        _pdfBytes = bytes != null ? Uint8List.fromList(bytes) : null;
-
-        if (_pdfBytes == null) {
-          setState(() {
-            _error = 'Không tìm thấy file PDF';
-          });
-          return;
-        }
-      } else {
-        // On mobile/desktop, use file path
-        if (_book.filePath == null) {
-          setState(() {
-            _error = 'Không tìm thấy file PDF';
-          });
-          return;
-        }
-
-        final file = File(_book.filePath!);
-        if (!await file.exists()) {
-          setState(() {
-            _error = 'File PDF không tồn tại';
-          });
-          return;
-        }
-
-        _pdfBytes = await file.readAsBytes();
-      }
-
-      // Extract text from PDF for TTS
-      _textContent = await _extractTextFromPdf();
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading PDF: $e');
-      setState(() {
-        _isLoading = false;
-        _error = 'Lỗi khi đọc file PDF: ${e.toString()}';
-      });
-    }
+    // Text cho TTS được trích khi bắt đầu nghe, để mở PDF nhanh hơn
+    _pdfBytes = await _readBookBytes();
   }
 
-  /// Extract text content from PDF for TTS.
-  ///
-  /// Sử dụng pdfrx để trích xuất text từ từng trang PDF.
-  Future<String> _extractTextFromPdf() async {
-    try {
-      if (_pdfBytes == null || _pdfBytes!.isEmpty) {
-        return '';
+  Future<void> _loadMobi() async {
+    final bytes = await _readBookBytes();
+    // Giải nén và tách HTML ở isolate khác để không đứng giao diện
+    final book = await compute(MobiParser.parse, bytes);
+    _mobiBook = book;
+
+    if (_currentChapterIndex >= book.chapters.length) {
+      _currentChapterIndex = 0;
+      _currentParagraphIndex = 0;
+    }
+    if (_currentParagraphIndex >= book.chapters[_currentChapterIndex].paragraphs.length) {
+      _currentParagraphIndex = 0;
+    }
+
+    _textContent = book.chapters.expand((c) => c.paragraphs).join('\n');
+  }
+
+  /// Tạo hàng đợi TTS: EPUB/MOBI theo paragraph, PDF theo trang.
+  Future<List<_TtsSegment>> _buildSegments() async {
+    final segments = <_TtsSegment>[];
+
+    if (_epubController != null) {
+      final paragraphs = _epubController!.paragraphs;
+      final buffer = StringBuffer();
+      var bufferSection = 0;
+      var bufferParagraph = 0;
+
+      void flush() {
+        if (buffer.isEmpty) return;
+        for (final chunk in TtsService.splitText(buffer.toString())) {
+          segments.add(_TtsSegment(chunk, bufferSection, bufferParagraph));
+        }
+        buffer.clear();
       }
 
-      final buffer = StringBuffer();
-
-      // Use pdfrx to extract text from all pages
-      final pdfDocument = await PdfDocument.openData(Uint8List.fromList(_pdfBytes!));
-      final totalPages = pdfDocument.pages.length;
-
-      for (int i = 0; i < totalPages; i++) {
-        try {
-          final page = pdfDocument.pages[i];
-          final text = await page.loadText();
-          if (text?.fullText.isNotEmpty ?? false) {
-            buffer.write(text!.fullText.trim());
-            buffer.write('\n\n');
+      for (int i = 0; i < paragraphs.length; i++) {
+        final text = paragraphs[i].text.trim();
+        if (text.isEmpty) continue;
+        final section = paragraphs[i].chapterIndex;
+        if (buffer.isNotEmpty &&
+            (section != bufferSection || buffer.length + text.length > MERGE_SEGMENT_LENGTH)) {
+          flush();
+        }
+        if (buffer.isEmpty) {
+          bufferSection = section;
+          bufferParagraph = i;
+        }
+        buffer.writeln(text);
+      }
+      flush();
+    } else if (_mobiBook != null) {
+      final chapters = _mobiBook!.chapters;
+      for (int c = 0; c < chapters.length; c++) {
+        final paragraphs = chapters[c].paragraphs;
+        final buffer = StringBuffer();
+        var bufferParagraph = 0;
+        for (int i = 0; i < paragraphs.length; i++) {
+          if (buffer.isNotEmpty && buffer.length + paragraphs[i].length > MERGE_SEGMENT_LENGTH) {
+            for (final chunk in TtsService.splitText(buffer.toString())) {
+              segments.add(_TtsSegment(chunk, c, bufferParagraph));
+            }
+            buffer.clear();
           }
-        } catch (e) {
-          print('Error extracting text from PDF page $i: $e');
-          continue;
+          if (buffer.isEmpty) bufferParagraph = i;
+          buffer.writeln(paragraphs[i]);
+        }
+        for (final chunk in TtsService.splitText(buffer.toString())) {
+          segments.add(_TtsSegment(chunk, c, bufferParagraph));
         }
       }
-
-      return buffer.toString();
-    } catch (e) {
-      print('Error extracting text from PDF: $e');
-      // Fallback: try alternative method
+    } else if (_pdfBytes != null && _pdfBytes!.isNotEmpty) {
+      final document = await PdfDocument.openData(Uint8List.fromList(_pdfBytes!));
       try {
-        final pdfDocument = await PdfDocument.openData(Uint8List.fromList(_pdfBytes!));
-        final totalPages = pdfDocument.pages.length;
-        final buffer = StringBuffer();
-
-        for (int i = 0; i < totalPages; i++) {
+        for (int i = 0; i < document.pages.length; i++) {
           try {
-            final page = pdfDocument.pages[i];
-            final text = await page.loadText();
-            if (text?.fullText.isNotEmpty ?? false) {
-              buffer.write(text!.fullText.trim());
-              buffer.write('\n\n');
+            final text = await document.pages[i].loadText();
+            final fullText = text?.fullText.trim() ?? '';
+            for (final chunk in TtsService.splitText(fullText)) {
+              segments.add(_TtsSegment(chunk, i, 0));
             }
           } catch (e) {
             print('Error extracting text from PDF page $i: $e');
-            continue;
           }
         }
-        return buffer.toString();
-      } catch (e2) {
-        print('Alternative PDF extraction also failed: $e2');
-        return '';
+      } finally {
+        await document.dispose();
       }
     }
+
+    return segments;
   }
-  
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -308,40 +300,105 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Error')),
+        appBar: AppBar(title: const Text('Lỗi')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
               const SizedBox(height: 16),
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => _loadBook(),
-                child: const Text('Retry'),
+                child: const Text('Thử lại'),
               ),
             ],
           ),
         ),
       );
     }
-    
+
     if (_isAudioMode) {
       return _buildAudioMode();
     }
-    
-    if (_book.fileType.contains('pdf')) {
+
+    if (_isPdf) {
       return _buildPdfReader();
     }
-    
-    return _buildEpubReader();
+
+    return _buildTextReader();
   }
-  
-  Widget _buildEpubReader() {
+
+  List<PopupMenuEntry<String>> _menuItems(BuildContext context) => const [
+    PopupMenuItem(
+      value: 'share',
+      child: ListTile(
+        leading: Icon(Icons.share),
+        title: Text('Chia sẻ'),
+      ),
+    ),
+    PopupMenuItem(
+      value: 'export',
+      child: ListTile(
+        leading: Icon(Icons.file_download),
+        title: Text('Xuất file'),
+      ),
+    ),
+    PopupMenuItem(
+      value: 'settings',
+      child: ListTile(
+        leading: Icon(Icons.settings),
+        title: Text('Cài đặt'),
+      ),
+    ),
+  ];
+
+  void _onMenuSelected(String value) {
+    if (value == 'share') {
+      _shareBook();
+    } else if (value == 'export') {
+      _exportBook();
+    } else if (value == 'settings') {
+      _showSettingsDialog();
+    }
+  }
+
+  /// Trình đọc EPUB hoặc MOBI (MOBI hiển thị từng chương dạng danh sách đoạn văn).
+  Widget _buildTextReaderBody() {
+    if (_mobiBook != null) return _buildMobiViewer();
+    if (_epubController != null) return _buildEpubViewer();
+    return const Center(child: Text('Đang tải sách...'));
+  }
+
+  Widget _buildMobiViewer() {
+    final chapter = _mobiBook!.chapters[_currentChapterIndex];
+    return ListView.builder(
+      key: PageStorageKey('mobi_chapter_$_currentChapterIndex'),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 96),
+      itemCount: chapter.paragraphs.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(chapter.title, style: Theme.of(context).textTheme.titleLarge),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            chapter.paragraphs[index - 1],
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTextReader() {
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -365,50 +422,15 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.volume_up),
-            onPressed: () {
-              setState(() => _isAudioMode = true);
-              _startAudioReading();
-            },
+            onPressed: _enterAudioMode,
           ),
           PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'share') {
-                _shareBook();
-              } else if (value == 'export') {
-                _exportBook();
-              } else if (value == 'settings') {
-                _showSettingsDialog();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'share',
-                child: ListTile(
-                  leading: Icon(Icons.share),
-                  title: Text('Chia sẻ'),
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'export',
-                child: ListTile(
-                  leading: Icon(Icons.file_download),
-                  title: Text('Xuất file'),
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'settings',
-                child: ListTile(
-                  leading: Icon(Icons.settings),
-                  title: Text('Cài đặt'),
-                ),
-              ),
-            ],
+            onSelected: _onMenuSelected,
+            itemBuilder: _menuItems,
           ),
         ],
       ),
-      body: _epubController != null
-        ? _buildEpubViewer()
-        : const Center(child: Text('Loading EPUB...')),
+      body: _buildTextReaderBody(),
       floatingActionButton: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -431,105 +453,42 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
   }
 
   Widget _buildEpubViewer() {
-    try {
-      return KatbookEpubReader(
-        controller: _epubController!,
-        initialTheme: ReaderTheme.light,
-        initialFontSize: 16.0,
-        showAppBar: false,
-        onChapterChanged: (chapter) {
-          _currentChapterIndex = chapter.startIndex;
-        },
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        contentWidthPercent: 0.85,
-      );
-    } catch (e) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('EPUB Error: ${e.toString()}'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => _loadBook(),
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  /// Web-specific PDF viewer using data URI.
-  ///
-  /// Trình xem PDF dành cho web sử dụng data URI từ pdfBytes.
-  Widget _buildPdfReaderWeb(String dataUri) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_book.title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.volume_up),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('PDF text-to-speech không được hỗ trợ')),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Builder(
-        builder: (context) {
-          // Trả về widget giữ iframe sống
-          return Container();
-        },
-      ),
+    final controller = _epubController!;
+    return KatbookEpubReader(
+      key: _readerKey,
+      controller: controller,
+      initialTheme: ReaderTheme.light,
+      initialFontSize: 16.0,
+      showAppBar: false,
+      initialPosition: _currentParagraphIndex > 0
+          ? ReadingPosition(
+              chapterIndex: _currentChapterIndex,
+              paragraphIndex: _currentParagraphIndex,
+              totalParagraphs: controller.totalParagraphs,
+            )
+          : null,
+      onChapterChanged: (chapter) {
+        final index = controller.flatChapters.indexOf(chapter);
+        if (index != -1 && index != _currentChapterIndex) {
+          setState(() => _currentChapterIndex = index);
+        }
+      },
+      onPositionChanged: (position) {
+        _currentParagraphIndex = position.paragraphIndex;
+        _saveProgress();
+      },
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      contentWidthPercent: 0.85,
     );
   }
 
-  /// PDF reader widget - tự động chọn mode phù hợp.
-  ///
-  /// - Web: Sử dụng data URI với _buildPdfReaderWeb
-  /// - Mobile/Desktop: Sử dụng PdfViewer widget
+  /// PDF reader, dùng pdfrx trên mọi nền tảng (kể cả web).
   Widget _buildPdfReader() {
-    if (kIsWeb) {
-      // On web, use data URI from pdfBytes
-      if (_pdfBytes != null) {
-        final base64Pdf = base64Encode(_pdfBytes!);
-        final dataUri = 'data:application/pdf;base64,$base64Pdf';
-        return _buildPdfReaderWeb(dataUri);
-      }
-
-      // Fallback for web without file bytes
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(_book.title),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.file_open, size: 64, color: Colors.grey),
-              const SizedBox(height: 16),
-              Text('PDF loading...'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => _loadBook(),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // On mobile/desktop, use PdfViewer with pdfBytes
     if (_pdfBytes != null) {
       return pdf_widgets.PdfViewer(
         pdfBytes: _pdfBytes!,
         fileName: _book.title,
+        onListen: _enterAudioMode,
       );
     }
 
@@ -542,20 +501,20 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.grey),
+            const Icon(Icons.error_outline, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            Text('PDF file not loaded'),
+            const Text('Chưa tải được file PDF'),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => _loadBook(),
-              child: const Text('Retry'),
+              child: const Text('Thử lại'),
             ),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildAudioMode() {
     return Scaffold(
       appBar: AppBar(
@@ -563,16 +522,19 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
           children: [
             const Icon(Icons.volume_up),
             const SizedBox(width: 8),
-            Text('Audio Mode - ${_book.title}'),
+            Expanded(
+              child: Text(
+                _book.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.close),
-            onPressed: () {
-              context.read<TtsService>().stop();
-              setState(() => _isAudioMode = false);
-            },
+            onPressed: _exitAudioMode,
           ),
         ],
       ),
@@ -584,15 +546,29 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
             child: Center(
               child: Consumer<TtsService>(
                 builder: (context, ttsService, child) {
+                  final isSpeaking = _audioStarted && ttsService.isSpeaking;
                   return Column(
                     children: [
-                      if (ttsService.isSpeaking)
-                        AnimatedAudioWave()
+                      if (_isPreparingAudio)
+                        const CircularProgressIndicator()
+                      else if (isSpeaking)
+                        const AnimatedAudioWave()
                       else
                         Icon(
                           Icons.queue_music,
                           size: 64,
                           color: Theme.of(context).colorScheme.primary,
+                        ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _currentSectionLabel(),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      if (_segments != null && _segments!.isNotEmpty && _audioStarted)
+                        Text(
+                          'Đoạn ${ttsService.currentIndex + 1}/${_segments!.length}',
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                       const SizedBox(height: 24),
                       Row(
@@ -600,29 +576,33 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.skip_previous),
-                            onPressed: () => _goToPreviousChapterAudio(),
+                            onPressed: _isPreparingAudio ? null : () => _jumpSectionAudio(-1),
                           ),
                           IconButton(
                             icon: Icon(
-                              ttsService.isSpeaking ? Icons.pause : Icons.play_arrow,
+                              isSpeaking ? Icons.pause : Icons.play_arrow,
                               size: 48,
                             ),
-                            onPressed: () {
-                              if (ttsService.isSpeaking) {
-                                context.read<TtsService>().pause();
-                              } else {
-                                _startAudioReading();
-                              }
-                            },
+                            onPressed: _isPreparingAudio
+                                ? null
+                                : () {
+                                    if (isSpeaking) {
+                                      ttsService.pause();
+                                    } else if (_audioStarted && ttsService.hasQueue) {
+                                      ttsService.resume();
+                                    } else {
+                                      _startAudioReading();
+                                    }
+                                  },
                           ),
                           IconButton(
                             icon: const Icon(Icons.skip_next),
-                            onPressed: () => _goToNextChapterAudio(),
+                            onPressed: _isPreparingAudio ? null : () => _jumpSectionAudio(1),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      VoiceSelector(),
+                      const VoiceSelector(),
                     ],
                   );
                 },
@@ -633,49 +613,153 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       ),
     );
   }
-  
-  void _startAudioReading() {
-    if (_textContent != null && _textContent!.isNotEmpty) {
-      context.read<TtsService>().speak(_textContent!);
+
+  String _currentSectionLabel() {
+    if (_isPdf) {
+      return 'Trang ${_currentChapterIndex + 1}';
     }
+    final mobiChapters = _mobiBook?.chapters;
+    if (mobiChapters != null && _currentChapterIndex < mobiChapters.length) {
+      return mobiChapters[_currentChapterIndex].title;
+    }
+    final chapters = _epubController?.flatChapters ?? [];
+    if (_currentChapterIndex < chapters.length) {
+      final title = chapters[_currentChapterIndex].title.trim();
+      if (title.isNotEmpty) return title;
+    }
+    return 'Chương ${_currentChapterIndex + 1}';
   }
-  
-  Future<void> _goToNextChapter() async {
-    if (_epubController != null) {
-      final chapters = _epubController?.flatChapters ?? [];
-      if (chapters.isNotEmpty && _currentChapterIndex < chapters.length - 1) {
-        _currentChapterIndex++;
-        context.read<BookProvider>().saveReadingProgress(
-          _book.id, _currentChapterIndex, 0,
-        );
-        setState(() {});
+
+  void _enterAudioMode() {
+    setState(() => _isAudioMode = true);
+    _startAudioReading();
+  }
+
+  void _exitAudioMode() {
+    _tts.stop();
+    _audioStarted = false;
+    setState(() => _isAudioMode = false);
+  }
+
+  /// Bắt đầu đọc từ vị trí hiện tại (chương/trang và paragraph đang xem).
+  Future<void> _startAudioReading({int? startSegment}) async {
+    if (_segments == null) {
+      setState(() => _isPreparingAudio = true);
+      try {
+        _segments = await _buildSegments();
+      } catch (e) {
+        print('Error preparing audio: $e');
+        _segments = [];
+      }
+      if (!mounted) return;
+      setState(() => _isPreparingAudio = false);
+    }
+
+    final segments = _segments!;
+    if (segments.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không có nội dung văn bản để đọc')),
+      );
+      return;
+    }
+
+    final start = startSegment ?? _segmentIndexForPosition(_currentChapterIndex, _currentParagraphIndex);
+
+    _tts.onChunkStarted = _onSegmentStarted;
+    _tts.onQueueCompleted = null;
+    _tts.onSkipNext = () => _jumpSectionAudio(1);
+    _tts.onSkipPrevious = () => _jumpSectionAudio(-1);
+    _audioStarted = true;
+    await _tts.speakQueue(segments.map((s) => s.text).toList(), startIndex: start);
+  }
+
+  int _segmentIndexForPosition(int section, int paragraphIndex) {
+    final segments = _segments ?? [];
+    for (int i = 0; i < segments.length; i++) {
+      final s = segments[i];
+      if (s.section > section || (s.section == section && s.paragraphIndex >= paragraphIndex)) {
+        // Lùi về đoạn chứa paragraph đang xem nếu có
+        if (i > 0 && segments[i - 1].section == section && s.paragraphIndex > paragraphIndex) {
+          return i - 1;
+        }
+        return i;
       }
     }
+    return 0;
   }
 
-  Future<void> _goToPreviousChapter() async {
-    if (_epubController != null && _currentChapterIndex > 0) {
-      _currentChapterIndex--;
-      context.read<BookProvider>().saveReadingProgress(
-        _book.id, _currentChapterIndex, 0,
-      );
-      setState(() {});
+  void _onSegmentStarted(int index) {
+    final segments = _segments;
+    if (!mounted || segments == null || index >= segments.length) return;
+    final segment = segments[index];
+    setState(() {
+      _currentChapterIndex = segment.section;
+      _currentParagraphIndex = segment.paragraphIndex;
+    });
+    _tts.setNowPlaying(_book.title, subtitle: _currentSectionLabel());
+    _saveProgress();
+  }
+
+  /// Nhảy sang chương/trang trước (-1) hoặc sau (+1) trong chế độ nghe.
+  Future<void> _jumpSectionAudio(int direction) async {
+    if (_segments == null) {
+      await _startAudioReading();
+      if (_segments == null || _segments!.isEmpty) return;
+    }
+    final segments = _segments!;
+    final sections = <int>[];
+    for (final s in segments) {
+      if (sections.isEmpty || sections.last != s.section) sections.add(s.section);
+    }
+
+    var pos = sections.indexWhere((s) => s >= _currentChapterIndex);
+    if (pos == -1) pos = sections.length - 1;
+    final target = (pos + direction).clamp(0, sections.length - 1);
+    final index = segments.indexWhere((s) => s.section == sections[target]);
+    if (index == -1) return;
+
+    if (_audioStarted && _tts.hasQueue) {
+      await _tts.jumpTo(index);
+    } else {
+      await _startAudioReading(startSegment: index);
     }
   }
 
-  void _goToNextChapterAudio() async {
-    await _goToNextChapter();
-    _startAudioReading();
+  void _saveProgress() {
+    context.read<BookProvider>().saveReadingProgress(
+      _book.id, _currentChapterIndex, _currentParagraphIndex,
+    );
   }
 
-  void _goToPreviousChapterAudio() async {
-    await _goToPreviousChapter();
-    _startAudioReading();
+  void _goToChapter(int index) {
+    if (_mobiBook != null) {
+      if (index < 0 || index >= _mobiBook!.chapters.length) return;
+      setState(() {
+        _currentChapterIndex = index;
+        _currentParagraphIndex = 0;
+      });
+      _saveProgress();
+      return;
+    }
+
+    final chapters = _epubController?.flatChapters ?? [];
+    if (index < 0 || index >= chapters.length) return;
+    final chapter = chapters[index];
+    _readerKey.currentState?.jumpToChapter(chapter);
+    setState(() {
+      _currentChapterIndex = index;
+      _currentParagraphIndex = chapter.startIndex;
+    });
+    _saveProgress();
   }
 
-  /// Lấy tổng số chương của sách EPUB.
+  void _goToNextChapter() => _goToChapter(_currentChapterIndex + 1);
+
+  void _goToPreviousChapter() => _goToChapter(_currentChapterIndex - 1);
+
+  /// Lấy tổng số chương của sách EPUB/MOBI.
   int _getTotalChapters() {
-    return _epubController?.tableOfContents.length ?? 1;
+    return _mobiBook?.chapters.length ?? _epubController?.flatChapters.length ?? 1;
   }
 
   /// Hiển thị dialog tìm kiếm trong sách.
@@ -696,7 +780,9 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
   /// Chia sẻ thông tin sách.
   Future<void> _shareBook() async {
     await SharePlus.instance.share(
-      'Tôi đang đọc: ${_book.title}\n\nTải app LibriAudio để đọc sách: https://example.com' as ShareParams,
+      ShareParams(
+        text: 'Tôi đang đọc: ${_book.title}\n\nTải app LibriAudio để đọc sách: https://example.com',
+      ),
     );
   }
 
@@ -733,7 +819,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
               onChanged: (value) => context.read<TtsService>().setRate(value),
             ),
             const SizedBox(height: 16),
-            VoiceSelector(),
+            const VoiceSelector(),
           ],
         ),
       ),
@@ -757,7 +843,7 @@ class AnimatedAudioWave extends StatelessWidget {
         children: List.generate(5, (index) => AnimatedPadding(
           key: Key('wave_$index'),
           duration: const Duration(milliseconds: 200),
-          padding: EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Container(
             width: 6,
             decoration: BoxDecoration(

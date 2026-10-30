@@ -34,9 +34,10 @@ class StorageService {
     }
 
     // Register adapters
-    Hive.registerAdapter(BookAdapter());
-    Hive.registerAdapter(ReadingStateAdapter());
-    Hive.registerAdapter(HighlightAdapter());
+    if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(BookAdapter());
+    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ReadingStateAdapter());
+    if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(HighlightAdapter());
+    if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(PlaylistAdapter());
 
     // Open boxes
     _booksBox = await Hive.openBox('books');
@@ -55,6 +56,7 @@ class StorageService {
   void updateBook(Book book) => _booksBox.put(book.id, book);
   void removeBook(String bookId) {
     _booksBox.delete(bookId);
+    _readingStatesBox.delete(bookId);
     // Also remove file bytes for this book on web
     if (kIsWeb) {
       _fileBytesBox.delete(bookId);
@@ -84,7 +86,10 @@ class StorageService {
     }
   }
 
-  ReadingState? getReadingState(String bookId) => _readingStatesBox.get(bookId);
+  ReadingState? getReadingState(String bookId) {
+    final state = _readingStatesBox.get(bookId);
+    return state is ReadingState ? state : null;
+  }
 
   // Highlights
   void saveHighlight(Highlight highlight) => _highlightsBox.put(highlight.id, highlight);
@@ -111,8 +116,22 @@ class StorageService {
   bool get darkMode => _prefs.getBool('dark_mode') ?? false;
   Future<void> saveDarkMode(bool enabled) => _prefs.setBool('dark_mode', enabled);
 
+  /// 'system', 'light' hoặc 'dark'. Null nếu người dùng chưa chọn.
+  String? get themeMode {
+    final mode = _prefs.getString('theme_mode');
+    if (mode != null) return mode;
+    // Bản cũ chỉ lưu dark_mode
+    if (_prefs.containsKey('dark_mode')) return darkMode ? 'dark' : 'light';
+    return null;
+  }
+
+  Future<void> saveThemeMode(String mode) => _prefs.setString('theme_mode', mode);
+
   String get lastDir => _prefs.getString('last_dir') ?? '';
   Future<void> saveLastDir(String path) => _prefs.setString('last_dir', path);
+
+  double get pitch => _prefs.getDouble('pitch') ?? 1.0;
+  Future<void> savePitch(double pitch) => _prefs.setDouble('pitch', pitch);
 
   // File operations
   Future<String?> saveFileToFileSystem(
@@ -128,6 +147,22 @@ class StorageService {
       print('Error saving file: $e');
       return null;
     }
+  }
+
+  /// Copy a picked file into the app's own folder so it survives cache cleanup
+  /// (file_picker on Android returns a copy inside the cache directory).
+  Future<String> copyFileToLibrary(String sourcePath) async {
+    if (kIsWeb) return sourcePath;
+    final docsDir = await getApplicationDocumentsDirectory();
+    final libraryDir = Directory(p.join(docsDir.path, 'books'));
+    if (p.isWithin(libraryDir.path, sourcePath)) return sourcePath;
+
+    final targetDir = Directory(
+      p.join(libraryDir.path, DateTime.now().microsecondsSinceEpoch.toString()),
+    );
+    await targetDir.create(recursive: true);
+    final copied = await File(sourcePath).copy(p.join(targetDir.path, p.basename(sourcePath)));
+    return copied.path;
   }
 
   /// Save file bytes to storage
@@ -186,37 +221,5 @@ class StorageService {
     } catch (e) {
       return null;
     }
-  }
-}
-
-class ReadingState {
-  final String bookId;
-  final int chapterIndex;
-  final int position;
-  final DateTime timestamp;
-
-  ReadingState({
-    required this.bookId,
-    required this.chapterIndex,
-    required this.position,
-    DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
-
-  Map<String, dynamic> toMap() {
-    return {
-      'bookId': bookId,
-      'chapterIndex': chapterIndex,
-      'position': position,
-      'timestamp': timestamp.toIso8601String(),
-    };
-  }
-
-  factory ReadingState.fromMap(Map<String, dynamic> map) {
-    return ReadingState(
-      bookId: map['bookId'],
-      chapterIndex: map['chapterIndex'],
-      position: map['position'],
-      timestamp: DateTime.parse(map['timestamp']),
-    );
   }
 }

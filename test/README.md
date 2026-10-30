@@ -7,8 +7,7 @@ Thư mục này chứa các test cho ứng dụng LibriAudio.
 ```
 test/
 ├── models_test.dart      # Unit tests cho Models
-├── features_test.dart    # Feature tests (Provider, State)
-├── e2e_test.dart         # End-to-end integration tests
+├── tts_split_test.dart   # Unit tests chia đoạn văn bản cho TTS
 └── README.md             # Tài liệu này
 ```
 
@@ -29,8 +28,7 @@ flutter test
 
 # Run specific test file
 flutter test test/models_test.dart
-flutter test test/features_test.dart
-flutter test test/e2e_test.dart
+flutter test test/tts_split_test.dart
 
 # Run with coverage
 flutter test --coverage
@@ -45,20 +43,11 @@ Kiểm tra logic của các Model classes:
 - ✅ Playlist model
 - ✅ Validation tests
 
-### 2. Feature Tests (`features_test.dart`)
-Kiểm tra các tính năng chính:
-- ✅ App khởi động với empty book list
-- ✅ Dark mode toggle
-- ✅ Add/remove books
-- ✅ Reading state persistence
-- ✅ TTS service
-
-### 3. E2E Tests (`e2e_test.dart`)
-Kiểm tra luồng người dùng hoàn chỉnh:
-- ✅ Complete user flow
-- ✅ User journey (import → read → highlight)
-- ✅ Audio playback flow
-- ✅ State persistence
+### 2. TTS Tests (`tts_split_test.dart`)
+Kiểm tra `TtsService.splitText`:
+- ✅ Đoạn ngắn giữ nguyên
+- ✅ Bỏ text rỗng
+- ✅ Chia đoạn dài không vượt độ dài tối đa
 
 ## 📈 Code Coverage
 
@@ -83,10 +72,10 @@ Test được chạy tự động trên:
 flutter test --verbose test/models_test.dart
 
 # Run test với hot reload
-flutter test --start-paused test/features_test.dart
+flutter test --start-paused test/tts_split_test.dart
 
 # Debug test
-flutter test --pause-isolates-on-start test/e2e_test.dart
+flutter test --pause-isolates-on-start test/models_test.dart
 ```
 
 ## ✅ Best Practices

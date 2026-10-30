@@ -177,6 +177,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Theo hệ thống'),
+                  Switch(
+                    value: context.watch<ThemeProvider>().themeMode == ThemeMode.system,
+                    onChanged: (followSystem) {
+                      final theme = context.read<ThemeProvider>();
+                      if (followSystem) {
+                        theme.setSystemMode();
+                      } else {
+                        theme.setThemeMode(theme.isDarkMode ? ThemeMode.dark : ThemeMode.light);
+                      }
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -197,13 +214,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 divisions: 15,
                 onChanged: (double value) => context.read<TtsService>().setRate(value),
               ),
-              Slider(
-                value: context.watch<TtsService>().rate,
-                min: 0.5,
-                max: 2.0,
-                divisions: 15,
-                onChanged: (double value) => context.read<TtsService>().setRate(value),
-              ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -212,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Consumer<TtsService>(
                     builder: (context, tts, child) {
                       final voice = tts.voice;
-                      return Text(voice);
+                      return Text(voice.isEmpty ? 'Mặc định' : voice);
                     },
                   ),
                 ],

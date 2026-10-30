@@ -15,22 +15,10 @@ class FileImportScreen extends StatefulWidget {
 }
 
 class _FileImportScreenState extends State<FileImportScreen> {
-  late final DriveService _driveService;
+  // Singleton dùng chung với Provider và BookProvider
+  final DriveService _driveService = DriveService();
   bool _isConnecting = false;
   String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _driveService = DriveService();
-    _checkAuthentication();
-  }
-
-  Future<void> _checkAuthentication() async {
-    if (_driveService.isAuthenticated) {
-      setState(() {});
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -178,24 +166,25 @@ class _FileImportScreenState extends State<FileImportScreen> {
       return;
     }
 
-    setState(() => _isConnecting = true);
+    setState(() {
+      _isConnecting = true;
+      _error = null;
+    });
 
     try {
       final success = await _driveService.authenticate();
-      if (mounted) {
-        if (success) {
-          setState(() {});
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Connected to Google Drive')),
-          );
-        } else {
-          setState(() {
-            _error = 'Failed to connect to Google Drive';
-            _isConnecting = false;
-          });
-        }
+      if (!mounted) return;
+      setState(() {
+        _isConnecting = false;
+        if (!success) _error = 'Failed to connect to Google Drive';
+      });
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connected to Google Drive')),
+        );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isConnecting = false;
@@ -208,7 +197,7 @@ class _FileImportScreenState extends State<FileImportScreen> {
     try {
       PlatformFile? result = await FilePicker.pickFile(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'epub', 'mobi'],
+        allowedExtensions: ['pdf', 'epub', 'mobi', 'azw', 'azw3'],
       );
 
       if (result == null) {
@@ -220,49 +209,43 @@ class _FileImportScreenState extends State<FileImportScreen> {
         return;
       }
 
-      final filePath = result.path;
-      if (filePath == null) {
-        if (mounted) {
-          setState(() {
-            _error = 'File path is null';
-          });
+      final bookProvider = context.read<BookProvider>();
+
+      if (kIsWeb) {
+        // Web không có đường dẫn file: lưu bytes vào Hive
+        final bytes = await result.readAsBytes();
+        await bookProvider.addBookFromBytes(result.name, bytes);
+      } else {
+        final filePath = result.path;
+        if (filePath == null || !File(filePath).existsSync()) {
+          if (mounted) {
+            setState(() {
+              _error = 'File not found: ${filePath ?? result.name}';
+            });
+          }
           return;
         }
+
+        print('Importing file: $filePath');
+        await bookProvider.addBookFromFilePath(filePath);
       }
 
-      print('Importing file: $filePath');
-
-      // Check if file exists
-      final file = File(filePath!);
-      if (!file.existsSync()) {
-        if (mounted) {
-          setState(() {
-            _error = 'File not found: $filePath';
-          });
-          return;
-        }
+      if (!mounted) return;
+      if (bookProvider.error != null) {
+        setState(() => _error = bookProvider.error);
+        return;
       }
-
-      // Import the file using the BookProvider
-      await context.read<BookProvider>().addBookFromFilePath(filePath);
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Book imported successfully')),
-        );
-      }
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Book imported successfully')),
+      );
     } catch (e) {
       print('Error importing file: $e');
+      if (!mounted) return;
       setState(() {
         _error = 'Error: ${e.toString()}';
       });
     }
-  }
-
-  @override
-  void dispose() {
-    _driveService.dispose();
-    super.dispose();
   }
 }
 
@@ -274,20 +257,19 @@ class GoogleDriveBooksScreen extends StatefulWidget {
 }
 
 class _GoogleDriveBooksScreenState extends State<GoogleDriveBooksScreen> {
+  // Giữ future để không gọi lại Drive API mỗi lần rebuild
+  Future<List<drive.File>>? _filesFuture;
+
   Future<void> _downloadAndImportFile(BuildContext context, drive.File file) async {
     try {
-      final driveService = context.read<DriveService>();
-      final filePath = await driveService.downloadFile(file, '');
-
-      if (filePath != null) {
-        await context.read<BookProvider>().importLocalFile(filePath);
-        if (mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Book imported: ${file.name}')),
-          );
-        }
-      }
+      final bookProvider = context.read<BookProvider>();
+      await bookProvider.addBookFromDrive(file);
+      if (!mounted) return;
+      final error = bookProvider.error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error == null ? 'Book imported: ${file.name}' : 'Error: $error')),
+      );
+      if (error == null) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -314,7 +296,7 @@ class _GoogleDriveBooksScreenState extends State<GoogleDriveBooksScreen> {
           }
 
           return FutureBuilder<List<drive.File>>(
-            future: driveService.driveApi != null ? driveService.listPdfAndEpubFiles() : Future.value([]),
+            future: _filesFuture ??= driveService.listPdfAndEpubFiles(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());

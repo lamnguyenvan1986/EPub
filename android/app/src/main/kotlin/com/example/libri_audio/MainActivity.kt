@@ -1,13 +1,7 @@
 package com.example.libri_audio
 
-import io.flutter.embedding.android.FlutterActivity
-import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugins.GeneratedPluginRegistrant
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity: FlutterActivity() {
-    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        super.configureFlutterEngine(flutterEngine)
-        // Google Sign In requires this for Android
-        GeneratedPluginRegistrant.registerWith(flutterEngine)
-    }
-}
+// AudioServiceActivity giữ Flutter engine sống để audio_service phát TTS nền.
+// Plugin được đăng ký tự động, không cần gọi GeneratedPluginRegistrant thủ công.
+class MainActivity : AudioServiceActivity()

@@ -48,10 +48,8 @@ libri_audio/
 │   └── fonts/                             # Custom fonts (NotoSans...)
 │
 ├── test/                                   # Test files
-│   ├── widget_test.dart                   # Widget tests
 │   ├── models_test.dart                   # Model unit tests
-│   ├── features_test.dart                 # Feature integration tests
-│   └── e2e_test.dart                      # End-to-end tests
+│   └── tts_split_test.dart                # TTS text splitting tests
 │
 ├── docs/                                   # Documentation
 │   ├── README.md                          # Tài liệu tổng quan

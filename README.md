@@ -76,8 +76,7 @@ Xem [Cấu trúc Thư mục](./docs/APP_FOLDER_STRUCTURE.md) để biết chi ti
 # Hoặc chạy manual
 flutter pub get
 flutter test test/models_test.dart
-flutter test test/features_test.dart
-flutter test test/e2e_test.dart
+flutter test test/tts_split_test.dart
 ```
 
 ## Loại Tests
@@ -85,8 +84,7 @@ flutter test test/e2e_test.dart
 | File | Mô tả | Mức độ |
 |------|-------|--------|
 | `test/models_test.dart` | Unit tests cho Models | ⭐⭐ |
-| `test/features_test.dart` | Feature tests | ⭐⭐⭐ |
-| `test/e2e_test.dart` | End-to-end tests | ⭐⭐⭐⭐ |
+| `test/tts_split_test.dart` | Unit tests chia đoạn TTS | ⭐⭐ |
 
 Xem chi tiết tại [test/README.md](test/README.md)
 
