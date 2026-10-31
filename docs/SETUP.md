@@ -33,6 +33,17 @@ flutter analyze
 | `test/mobi_parser_test.dart` | Đọc file MOBI/AZW, giải nén PalmDOC |
 | `test/drive_mime_test.dart` | Nhận loại sách từ MIME và đuôi file trên Drive |
 | `test/epub_repair_test.dart` | Sửa EPUB lỗi mục lục và manifest |
+| `test/neural_tts_test.dart` | Azure/Google TTS (HTTP giả lập), danh sách giọng offline; tạo WAV bằng sherpa-onnx nếu có model |
+
+Test sherpa-onnx cần file model và thư viện native, nên mặc định bị bỏ qua. Để chạy trên Linux:
+
+```bash
+# Tải và giải nén giọng (64 MB)
+curl -L -O https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-vi_VN-vais1000-medium.tar.bz2
+tar xjf vits-piper-vi_VN-vais1000-medium.tar.bz2
+LD_LIBRARY_PATH=~/.pub-cache/hosted/pub.dev/sherpa_onnx_linux-1.13.8/linux/x64 \
+PIPER_VI_MODEL_DIR=$PWD/vits-piper-vi_VN-vais1000-medium flutter test test/neural_tts_test.dart
+```
 
 `./run_tests.sh` chạy thêm analyze, build APK/iOS debug và kiểm tra format.
 

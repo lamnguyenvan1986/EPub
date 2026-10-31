@@ -133,6 +133,23 @@ class StorageService {
   double get pitch => _prefs.getDouble('pitch') ?? 1.0;
   Future<void> savePitch(double pitch) => _prefs.setDouble('pitch', pitch);
 
+  // Bộ đọc TTS: 'system', 'offline', 'azure' hoặc 'google'. Key API lưu ở
+  // flutter_secure_storage (TtsService), không lưu ở đây.
+  String? get ttsEngine => _prefs.getString('tts_engine');
+  Future<void> saveTtsEngine(String engine) => _prefs.setString('tts_engine', engine);
+
+  String? get offlineVoiceId => _prefs.getString('offline_voice_id');
+  Future<void> saveOfflineVoiceId(String id) => _prefs.setString('offline_voice_id', id);
+
+  String? get azureVoice => _prefs.getString('azure_voice');
+  Future<void> saveAzureVoice(String voice) => _prefs.setString('azure_voice', voice);
+
+  String? get azureRegion => _prefs.getString('azure_region');
+  Future<void> saveAzureRegion(String region) => _prefs.setString('azure_region', region);
+
+  String? get googleVoice => _prefs.getString('google_voice');
+  Future<void> saveGoogleVoice(String voice) => _prefs.setString('google_voice', voice);
+
   // File operations
   Future<String?> saveFileToFileSystem(
     Directory dir,

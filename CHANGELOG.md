@@ -2,6 +2,13 @@
 
 Các thay đổi quan trọng của LibriAudio. Chi tiết từng lỗi đã sửa xem [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md).
 
+## [1.2.0] - 2026-10-31
+### ✨ Thêm mới
+- Giọng đọc tiếng Việt ngoài giọng của máy (Cài đặt > Giọng đọc):
+  - Giọng offline Piper VAIS1000 chạy bằng sherpa-onnx, tải 64 MB một lần, không cần mạng (Android/iOS)
+  - Giọng cloud Microsoft Azure (Hoài My, Nam Minh) và Google Cloud (Chirp3 HD, Neural2, WaveNet), người dùng nhập key của mình
+  - Nghe thử; nếu giọng offline/cloud lỗi thì tự đọc tiếp bằng giọng máy và báo lý do
+
 ## [1.1.2] - 2026-10-31
 ### ✨ Thêm mới
 - Chạy được trên web, tự deploy lên GitHub Pages: https://lamnguyenvan1986.github.io/EPub/
