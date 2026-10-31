@@ -1,6 +1,16 @@
-# 📝 Change Log - LibriAudio
+# Changelog
 
-Tất cả các thay đổi quan trọng cho ứng dụng LibriAudio được ghi lại ở đây.
+Các thay đổi quan trọng của LibriAudio. Chi tiết từng lỗi đã sửa xem [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md).
+
+## [1.1.2] - 2026-10-31
+### ✨ Thêm mới
+- Chạy được trên web, tự deploy lên GitHub Pages: https://lamnguyenvan1986.github.io/EPub/
+- Tự sửa EPUB lỗi mục lục (`nav`, NCX) và manifest thiếu file; thông báo lỗi kèm lý do
+
+### 🐛 Bug fixes
+- Google Drive: hiện file AZW/AZW3, có nút kết nối, xử lý phiên hết hạn (401)
+- Build: ghim `image 4.10.2`, thay font hỏng; web chọn đúng giọng tiếng Việt
+- Safari iOS: chọn file không còn báo "No file selected"
 
 ## [1.1.1] - 2026-10-30
 ### ✨ Thêm mới
@@ -15,7 +25,7 @@ Tất cả các thay đổi quan trọng cho ứng dụng LibriAudio được gh
 - Sửa crash khi lưu tiến độ đọc, khi chia sẻ sách và ở dropdown chọn giọng
 - TTS đọc theo từng đoạn (vượt giới hạn độ dài của Android), đọc tiếp đúng vị trí, chuyển chương, dừng khi thoát màn hình, nghe được PDF
 - Google Drive dùng chung một phiên đăng nhập, tự lấy lại token, không ghi đè file trùng tên
-- Chi tiết: xem [BUGFIX_LOG.md](BUGFIX_LOG.md)
+- Chi tiết: xem [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md)
 
 ## [1.1.0] - 2026-09-18
 ### ✨ Thêm mới
@@ -67,24 +77,3 @@ Tất cả các thay đổi quan trọng cho ứng dụng LibriAudio được gh
 - Basic EPUB reader
 - Basic TTS functionality
 
----
-
-## Cách đọc changelog
-
-- **[Added]** - Tính năng mới
-- **[Changed]** - Thay đổi hiện có
-- **[Fixed]** - Bug fix
-- **[Removed]** - Tính năng bị xóa
-
----
-
-## Versioning
-
-Sử dụng Semantic Versioning:
-- `MAJOR.MINOR.PATCH`
-- `1.0.0` - Stable release
-- `0.9.0` - Pre-release
-
----
-
-**Happy Reading! 📚**
