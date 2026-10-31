@@ -396,7 +396,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
     return ListView.builder(
       key: PageStorageKey('mobi_chapter_$_currentChapterIndex'),
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 96),
-      itemCount: chapter.paragraphs.length + 1,
+      itemCount: chapter.blocks.length + 1,
       itemBuilder: (context, index) {
         if (index == 0) {
           return Padding(
@@ -404,10 +404,27 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
             child: Text(chapter.title, style: Theme.of(context).textTheme.titleLarge),
           );
         }
+        final block = chapter.blocks[index - 1];
+        if (block.isImage) {
+          final bytes = _mobiBook!.images[block.imageIndex];
+          if (bytes == null) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Center(
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.contain,
+                gaplessPlayback: true,
+                // Ảnh hỏng thì bỏ qua, không làm vỡ trang
+                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+              ),
+            ),
+          );
+        }
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
-            chapter.paragraphs[index - 1],
+            block.text!,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
           ),
         );
