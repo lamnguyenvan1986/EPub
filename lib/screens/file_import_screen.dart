@@ -6,6 +6,8 @@ import 'package:libri_audio/services/drive_service.dart';
 import 'package:libri_audio/providers/book_provider.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'dart:io' show File;
+import 'package:libri_audio/utils/file_picker_web_options_stub.dart'
+    if (dart.library.js_interop) 'package:libri_audio/utils/file_picker_web_options_web.dart';
 
 class FileImportScreen extends StatefulWidget {
   const FileImportScreen({super.key});
@@ -192,12 +194,18 @@ class _FileImportScreenState extends State<FileImportScreen> {
     }
   }
 
+  static const List<String> _supportedExtensions = ['pdf', 'epub', 'mobi', 'azw', 'azw3'];
+
   Future<void> _handleImportFromDevice() async {
     // Import from device using file picker
     try {
+      // Safari iOS làm mờ file có đuôi không nhận ra (.mobi, .azw...) khi lọc
+      // theo đuôi, nên trên web cho chọn mọi file rồi tự kiểm tra đuôi.
+      setState(() => _error = null);
       PlatformFile? result = await FilePicker.pickFile(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'epub', 'mobi', 'azw', 'azw3'],
+        type: kIsWeb ? FileType.any : FileType.custom,
+        allowedExtensions: kIsWeb ? null : _supportedExtensions,
+        webOptions: filePickerWebOptions(),
       );
 
       if (result == null) {
@@ -205,6 +213,16 @@ class _FileImportScreenState extends State<FileImportScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No file selected')),
           );
+        }
+        return;
+      }
+
+      final extension = result.name.split('.').last.toLowerCase();
+      if (!result.name.contains('.') || !_supportedExtensions.contains(extension)) {
+        if (mounted) {
+          setState(() {
+            _error = 'Unsupported file: ${result.name}. Choose a PDF, EPUB, MOBI or AZW file.';
+          });
         }
         return;
       }
