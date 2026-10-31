@@ -6,7 +6,7 @@
 
 ## Tính năng
 
-- Đọc EPUB (tự sửa các lỗi mục lục/manifest hay gặp), PDF và MOBI/AZW (không DRM).
+- Đọc EPUB (tự sửa các lỗi mục lục/manifest hay gặp), PDF và MOBI/AZW (không DRM, có ảnh, nén PalmDOC hoặc HUFF/CDIC).
 - Nghe sách: chọn giọng, chỉnh tốc độ và cao độ, đọc tiếp từ vị trí đã dừng, tự chuyển chương.
 - Phát nền trên Android/iOS: thông báo điều khiển, nút tai nghe, màn hình khoá.
 - Nhập sách từ máy hoặc từ Google Drive (chỉ trên Android/iOS).

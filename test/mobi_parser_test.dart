@@ -11,6 +11,8 @@ Uint8List buildMobi({
   int extraFlags = 0,
   String title = 'Sách thử',
   String? author,
+  List<List<int>> huffRecords = const [],
+  List<List<int>> imageRecords = const [],
 }) {
   const mobiHeaderLength = 232;
   final nameBytes = utf8.encode(title);
@@ -50,12 +52,24 @@ Uint8List buildMobi({
     ..setUint32(88, nameBytes.length)
     ..setUint32(128, author != null ? 0x40 : 0)
     ..setUint16(0xF2, extraFlags);
+  // Thứ tự record: 0, text, HUFF/CDIC, ảnh
+  if (huffRecords.isNotEmpty) {
+    r0
+      ..setUint32(0x70, 1 + textRecords.length)
+      ..setUint32(0x74, huffRecords.length);
+  }
+  r0.setUint32(0x6C, imageRecords.isEmpty ? 0xFFFFFFFF : 1 + textRecords.length + huffRecords.length);
   final record0 = r0.buffer.asUint8List()
     ..setAll(16, ascii.encode('MOBI'))
     ..setAll(16 + mobiHeaderLength, exthBytes)
     ..setAll(16 + mobiHeaderLength + exthBytes.length, nameBytes);
 
-  final records = [record0, ...textRecords.map(Uint8List.fromList)];
+  final records = [
+    record0,
+    ...textRecords.map(Uint8List.fromList),
+    ...huffRecords.map(Uint8List.fromList),
+    ...imageRecords.map(Uint8List.fromList),
+  ];
   final headerLength = 78 + records.length * 8 + 2;
   final header = ByteData(headerLength);
   final headerBytes = header.buffer.asUint8List()
@@ -73,6 +87,87 @@ Uint8List buildMobi({
     out.add(r);
   }
   return out.takeBytes();
+}
+
+/// Bộ mã HUFF/CDIC nhỏ để test: 255 cụm 1 byte (mã 8 bit, terminal) và 2 cụm
+/// mã 9 bit (đi qua bảng mincode/maxcode), trong đó 1 cụm nén đệ quy.
+class TestHuff {
+  static const String plainPhrase = 'xin chào ';
+  static const String nestedPhrase = 'AB';
+
+  /// Ghi chuỗi mã: phần tử 0..254 là byte, 255 là [plainPhrase], 256 là [nestedPhrase].
+  static Uint8List encode(List<int> symbols) {
+    final bits = <int>[];
+    void put(int code, int len) {
+      for (int i = len - 1; i >= 0; i--) {
+        bits.add((code >> i) & 1);
+      }
+    }
+
+    for (final r in symbols) {
+      if (r < 255) {
+        put(255 - r, 8);
+      } else {
+        put(256 - r, 9);
+      }
+    }
+    final out = Uint8List((bits.length + 7) ~/ 8);
+    for (int i = 0; i < bits.length; i++) {
+      if (bits[i] == 1) out[i >> 3] |= 0x80 >> (i & 7);
+    }
+    return out;
+  }
+
+  static List<int> symbolsFor(String text) => utf8.encode(text);
+
+  static List<Uint8List> records() {
+    final huff = ByteData(24 + 256 * 4 + 64 * 4);
+    huff.buffer.asUint8List().setAll(0, ascii.encode('HUFF'));
+    huff
+      ..setUint32(4, 0x18)
+      ..setUint32(8, 24)
+      ..setUint32(12, 24 + 256 * 4);
+    for (int i = 0; i < 256; i++) {
+      // byte đầu 0: mã 9 bit (không terminal); còn lại mã 8 bit, maxcode 255
+      huff.setUint32(24 + i * 4, i == 0 ? 8 : (8 | 0x80 | (255 << 8)));
+    }
+    for (int len = 1; len <= 32; len++) {
+      final base = 24 + 256 * 4 + (len - 1) * 8;
+      final (min, max) = switch (len) { 8 => (1, 255), 9 => (0, 256), _ => (0, 0) };
+      huff
+        ..setUint32(base, min)
+        ..setUint32(base + 4, max);
+    }
+
+    final phrases = <(List<int>, bool)>[
+      for (int b = 0; b < 255; b++) ([b], true),
+      (utf8.encode(plainPhrase), true),
+      (encode(utf8.encode(nestedPhrase)), false),
+    ];
+    final body = BytesBuilder();
+    final offsets = <int>[];
+    final tableLength = phrases.length * 2;
+    for (final (bytes, decoded) in phrases) {
+      offsets.add(tableLength + body.length);
+      final len = ByteData(2)..setUint16(0, bytes.length | (decoded ? 0x8000 : 0));
+      body
+        ..add(len.buffer.asUint8List())
+        ..add(bytes);
+    }
+    final cdic = ByteData(16 + tableLength);
+    cdic.buffer.asUint8List().setAll(0, ascii.encode('CDIC'));
+    cdic
+      ..setUint32(4, 0x10)
+      ..setUint32(8, phrases.length)
+      ..setUint32(12, 9);
+    for (int i = 0; i < offsets.length; i++) {
+      cdic.setUint16(16 + i * 2, offsets[i]);
+    }
+    final cdicBytes = BytesBuilder()
+      ..add(cdic.buffer.asUint8List())
+      ..add(body.takeBytes());
+    return [huff.buffer.asUint8List(), cdicBytes.takeBytes()];
+  }
 }
 
 void main() {
@@ -119,12 +214,52 @@ void main() {
       expect(book.chapters.single.paragraphs, ['Có dấu']);
     });
 
-    test('rejects DRM, HUFF compression and non-MOBI data', () {
+    test('reads HUFF/CDIC compressed text', () {
+      final records = TestHuff.records();
+      final text1 = TestHuff.encode([...TestHuff.symbolsFor('<p>'), 255, ...TestHuff.symbolsFor('bạn</p>')]);
+      final text2 = TestHuff.encode([...TestHuff.symbolsFor('<p>'), 256, 256, ...TestHuff.symbolsFor('</p>')]);
+      final book = MobiParser.parse(buildMobi(
+        textRecords: [text1, text2],
+        compression: MobiParser.COMPRESSION_HUFF,
+        huffRecords: records,
+      ));
+
+      expect(book.chapters.single.paragraphs, ['xin chào bạn', 'ABAB']);
+    });
+
+    test('HUFF/CDIC without tables is reported as corrupt', () {
       final text = [utf8.encode('<p>x</p>')];
-      expect(() => MobiParser.parse(buildMobi(textRecords: text, encryption: 2)),
-          throwsA(isA<MobiFormatException>()));
-      expect(() => MobiParser.parse(buildMobi(textRecords: text, compression: MobiParser.COMPRESSION_HUFF)),
-          throwsA(isA<MobiFormatException>()));
+      expect(
+        () => MobiParser.parse(buildMobi(textRecords: text, compression: MobiParser.COMPRESSION_HUFF)),
+        throwsA(isA<MobiFormatException>()),
+      );
+    });
+
+    test('keeps images in place and drops missing or unknown ones', () {
+      final jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3];
+      final png = [0x89, 0x50, 0x4E, 0x47, 4, 5];
+      final notImage = ascii.encode('FLIS0000');
+      final content = utf8.encode('<p>Trước ảnh</p><p><img recindex="00001" /></p><p>Giữa<img hirecindex="2"/>sau</p>'
+          '<img recindex="3"><img recindex="9"><mbp:pagebreak/><img src="kindle:embed:0002?mime=image/png"/>');
+      final book = MobiParser.parse(buildMobi(textRecords: [content], imageRecords: [jpeg, png, notImage]));
+
+      expect(book.images.keys, unorderedEquals([1, 2]));
+      expect(book.images[1], jpeg);
+      final blocks = book.chapters[0].blocks;
+      expect(blocks.map((b) => b.isImage ? 'img${b.imageIndex}' : b.text),
+          ['Trước ảnh', 'img1', 'Giữa', 'img2', 'sau']);
+      expect(book.chapters[0].paragraphs, ['Trước ảnh', 'Giữa', 'sau']);
+      // Chương chỉ có ảnh vẫn được giữ
+      expect(book.chapters[1].blocks.single.imageIndex, 2);
+      expect(book.chapters[1].paragraphs, isEmpty);
+    });
+
+    test('rejects DRM with a clear message and non-MOBI data', () {
+      final text = [utf8.encode('<p>x</p>')];
+      expect(
+        () => MobiParser.parse(buildMobi(textRecords: text, encryption: 2)),
+        throwsA(isA<MobiFormatException>().having((e) => e.message, 'message', contains('DRM'))),
+      );
       expect(() => MobiParser.parse(Uint8List(200)), throwsA(isA<MobiFormatException>()));
     });
   });

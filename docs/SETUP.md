@@ -30,7 +30,7 @@ flutter analyze
 |------|----------|
 | `test/models_test.dart` | Model Book, Highlight, Playlist (tạo, toMap/fromMap, copyWith) |
 | `test/tts_split_test.dart` | `TtsService.splitText` chia đoạn văn cho TTS |
-| `test/mobi_parser_test.dart` | Đọc file MOBI/AZW, giải nén PalmDOC |
+| `test/mobi_parser_test.dart` | Đọc file MOBI/AZW, giải nén PalmDOC và HUFF/CDIC, ảnh, DRM |
 | `test/drive_mime_test.dart` | Nhận loại sách từ MIME và đuôi file trên Drive |
 | `test/epub_repair_test.dart` | Sửa EPUB lỗi mục lục và manifest |
 | `test/neural_tts_test.dart` | Azure/Google TTS (HTTP giả lập), danh sách giọng offline; tạo WAV bằng sherpa-onnx nếu có model |
@@ -81,6 +81,6 @@ Drive chỉ dùng trên Android/iOS; trên web nút Drive bị tắt.
 | `decodeLazy isn't defined` khi build | Kiểm tra `dependency_overrides: image: 4.10.2` còn trong `pubspec.yaml` |
 | Web đọc bằng giọng tiếng Anh | Trình duyệt chưa có giọng `vi-VN`; chọn giọng trong Cài đặt hoặc cài giọng tiếng Việt cho hệ điều hành |
 | "Không thể đọc file EPUB" kèm lý do | App đã thử tự sửa; nếu vẫn lỗi, ghi lại lý do và file để thêm vào `epub_repair.dart` |
-| MOBI không mở được | File có DRM hoặc nén HUFF/CDIC (chưa hỗ trợ) |
+| MOBI không mở được | File có DRM (không hỗ trợ, app báo lỗi rõ ràng) |
 | `No devices detected` | `flutter doctor`, `flutter doctor --android-licenses` |
 | Lỗi khi `pub get` | `flutter pub cache repair && flutter pub get` |

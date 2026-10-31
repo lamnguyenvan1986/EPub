@@ -2,6 +2,12 @@
 
 Các thay đổi quan trọng của LibriAudio. Chi tiết từng lỗi đã sửa xem [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md).
 
+## [1.3.0] - 2026-10-31
+### ✨ Thêm mới
+- MOBI/AZW: hiện ảnh trong sách (JPEG, PNG, GIF, BMP) đúng vị trí trong chương
+- MOBI/AZW: đọc được file nén HUFF/CDIC (thường gặp ở sách Kindle cũ)
+- File có DRM báo rõ lý do không mở được
+
 ## [1.2.0] - 2026-10-31
 ### ✨ Thêm mới
 - Giọng đọc tiếng Việt ngoài giọng của máy (Cài đặt > Giọng đọc):

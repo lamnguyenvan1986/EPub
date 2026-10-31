@@ -75,7 +75,7 @@ Chưa chạy trên thiết bị thật; cần thử TTS và Google Drive trên A
 | 38 | `main.dart`, `playlist_provider.dart`, `highlight_provider.dart` | Provider chưa đăng ký, không load từ storage | Đăng ký trong `MultiProvider`, load playlist/highlight từ Hive |
 | MOBI | `lib/services/mobi_parser.dart` (mới), `book_reader_screen.dart`, `drive_service.dart`, `file_import_screen.dart` | Import cho chọn `.mobi` nhưng mở ra báo "không hỗ trợ" | Tự viết bộ đọc MOBI/AZW: PalmDB, nén PalmDOC, bỏ trailing bytes, tiêu đề/tác giả từ EXTH, tách chương theo `<mbp:pagebreak/>`. Màn đọc MOBI theo từng chương, tìm kiếm, nghe bằng TTS như EPUB. Cho chọn thêm `.azw`, `.azw3` |
 
-Giới hạn MOBI: chưa hỗ trợ file có DRM và file nén HUFF/CDIC (báo lỗi rõ ràng); AZW3 (KF8) đọc được text nhưng thường chỉ thành một chương; chưa hiển thị ảnh.
+Giới hạn MOBI: chưa hỗ trợ file có DRM và file nén HUFF/CDIC (báo lỗi rõ ràng); AZW3 (KF8) đọc được text nhưng thường chỉ thành một chương; chưa hiển thị ảnh. (Ảnh và HUFF/CDIC đã thêm ở đợt 2026-10-31, xem cuối file.)
 
 Chưa kiểm tra trên thiết bị: phát nền Android/iOS (không có Android SDK trong môi trường build) và file MOBI thật (chỉ test bằng file MOBI tạo trong test).
 
@@ -127,3 +127,13 @@ Kiểm tra: Playwright giả lập Safari (gửi `focus` trước khi chọn fil
 | 47 | `lib/services/epub_repair.dart` | EPUB của Lam: manifest khai báo `OEBPS/notes.html` nhưng zip không có → "file ... not found in archive" | Khi sửa: file trùng tên khác hoa/thường hoặc mã hoá URL thì chép sang đúng tên; thiếu hẳn thì thêm file rỗng |
 
 Kiểm tra: 34 EPUB mẫu của epubx: trước 31/34 mở được, sau 33/34 (còn `svg-in-spine.epub`: trang SVG trong spine). Test mới `test/epub_repair_test.dart` (4 case). `flutter test` → 31/31 pass. Bản web trên Chromium mở được `trees.epub` nhờ sửa.
+
+### Đợt 7 (2026-10-31): MOBI có ảnh và nén HUFF/CDIC
+
+| # | File | Lỗi | Cách sửa |
+|---|------|-----|----------|
+| 48 | `lib/services/mobi_parser.dart` | File MOBI nén HUFF/CDIC (sách Kindle cũ) báo "chưa được hỗ trợ" | Thêm `HuffCdicReader` (theo cách giải của Calibre): bảng mã HUFF + từ điển CDIC, giải đệ quy các cụm còn nén. Chỉ dùng số nguyên dưới 2^53 để chạy đúng trên web |
+| 49 | `lib/services/mobi_parser.dart`, `lib/screens/book_reader_screen.dart` | Sách MOBI không hiện ảnh (thẻ `<img>` bị bỏ) | Chương gồm các khối chữ/ảnh (`MobiBlock`); ảnh lấy từ record theo `recindex`/`hirecindex` hoặc `kindle:embed`, chỉ giữ JPEG/PNG/GIF/BMP; màn đọc hiện ảnh bằng `Image.memory`. TTS và vị trí đọc vẫn dùng danh sách đoạn chữ như cũ |
+| 50 | `lib/services/mobi_parser.dart` | File có DRM chỉ báo "có DRM, không thể đọc" | Thông báo nói rõ là khoá bản quyền Amazon/Kindle và cần file không DRM. Không giải mã DRM |
+
+Kiểm tra: test mới dựng file HUFF/CDIC (mã 8 bit và 9 bit, cụm nén đệ quy) và file có ảnh; dữ liệu HUFF cũng được giải bằng bản Python theo Calibre cho cùng kết quả. `test/mobi_parser_test.dart` pass trên Dart VM và trên Chromium (`flutter test --platform chrome`). `flutter test` → 43 pass (1 skip cần model Piper). Chưa thử với file MOBI thật.

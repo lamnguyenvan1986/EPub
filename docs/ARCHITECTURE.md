@@ -33,7 +33,7 @@ lib/
 │   │   ├── offline_tts.dart          # Export có điều kiện: offline_tts_io (mobile) / offline_tts_stub (web)
 │   │   ├── offline_tts_io.dart       # Tải, giải nén giọng; sherpa-onnx chạy trong isolate riêng
 │   │   └── audio_source*.dart        # Bytes -> AudioSource: file tạm (mobile), data URI (web)
-│   ├── mobi_parser.dart          # Đọc MOBI/AZW (PalmDB, nén PalmDOC), trích text theo chương
+│   ├── mobi_parser.dart          # Đọc MOBI/AZW (PalmDB, nén PalmDOC và HUFF/CDIC), trích text và ảnh theo chương
 │   ├── epub_repair.dart          # Sửa OPF/manifest EPUB lỗi để epubx mở được
 │   ├── drive_service.dart        # Google Sign-In + Drive API (tắt trên web)
 │   └── firebase_service.dart     # Chưa được gọi ở đâu, Firebase chưa khởi tạo
@@ -74,7 +74,7 @@ lib/
 
 - **EPUB:** `katbook_epub_reader` (bên trong là epubx). Nếu mở lỗi, `EpubRepair.repair()` sửa OPF/manifest và mở lại; nếu vẫn lỗi thì hiện lý do từ thư viện.
 - **PDF:** `pdfrx` để hiển thị và trích text.
-- **MOBI/AZW:** `MobiParser` trích text theo chương, hiển thị bằng text reader của app. Không hỗ trợ DRM, nén HUFF/CDIC và ảnh.
+- **MOBI/AZW:** `MobiParser` trích nội dung theo chương thành các khối (`MobiBlock`: đoạn văn hoặc ảnh), hiển thị bằng text reader của app. Ảnh lấy từ record ảnh theo `recindex` (MOBI) hoặc `kindle:embed` (KF8), chỉ giữ JPEG/PNG/GIF/BMP. `MobiChapter.paragraphs` chỉ gồm chữ, dùng cho TTS và lưu vị trí. Nén HUFF/CDIC giải bằng `HuffCdicReader` (chỉ dùng số nguyên dưới 2^53 nên chạy đúng trên web). File có DRM báo lỗi, không giải mã.
 
 ## Luồng nghe (TTS)
 
