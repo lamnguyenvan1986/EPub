@@ -27,6 +27,13 @@ void main() {
       expect(v.modelFileName, 'vi_VN-vais1000-medium.onnx');
       expect(offlineVoiceById('khong-co').id, offlineViVoices.first.id);
     });
+
+    test('Bản web tải model gốc Piper từ Hugging Face', () {
+      final v = offlineVoiceById('vi_VN-vais1000-medium');
+      expect(v.webModelUrl,
+          'https://huggingface.co/rhasspy/piper-voices/resolve/main/vi/vi_VN/vais1000/medium/vi_VN-vais1000-medium.onnx');
+      expect(v.webConfigUrl, '${v.webModelUrl}.json');
+    });
   });
 
   group('AzureTtsEngine', () {

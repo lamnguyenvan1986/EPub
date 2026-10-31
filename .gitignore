@@ -69,3 +69,6 @@ firebase-debug.log
 # docs/ được giữ nguyên vì là tài liệu chính
 # Widget Preview related
 .widget_preview/
+
+# Thư viện giọng offline web (tool/fetch_piper_web.sh tải về)
+/web/piper/vendor/

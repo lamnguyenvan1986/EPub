@@ -2,7 +2,7 @@ name: libri_audio
 description: Một ứng dụng đọc sách với tính năng nghe audio, lưu vị trí, chọn giọng đọc, đánh dấu, ghi chú và đồng bộ với Firebase.
 version: 1.0.0+1
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.3.0 <4.0.0'  # 3.3: extension type cho dart:js_interop (offline_tts_web.dart)
 
 dependencies:
   flutter:

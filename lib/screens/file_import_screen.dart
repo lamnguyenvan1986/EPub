@@ -23,6 +23,12 @@ class _FileImportScreenState extends State<FileImportScreen> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _driveService.prepare();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -32,8 +38,7 @@ class _FileImportScreenState extends State<FileImportScreen> {
           onPressed: Navigator.of(context).pop,
         ),
         actions: [
-          if (!kIsWeb) ...[
-            Consumer<DriveService>(
+          Consumer<DriveService>(
               builder: (context, driveService, child) {
                 if (driveService.isAuthenticated) {
                   return TextButton(
@@ -59,7 +64,6 @@ class _FileImportScreenState extends State<FileImportScreen> {
                 );
               },
             ),
-          ],
         ],
       ),
       body: Padding(
@@ -77,26 +81,18 @@ class _FileImportScreenState extends State<FileImportScreen> {
                     onPressed: _handleImportFromDevice,
                   ),
                   const SizedBox(height: 16),
-                  if (!kIsWeb) ...[
-                    _buildImportMethodCard(
-                      icon: Icons.cloud_upload_outlined,
-                      title: 'Import from Google Drive',
-                      description: 'Select books from your Google Drive',
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => GoogleDriveBooksScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ] else ...[
-                    _buildDisabledCard(
-                      icon: Icons.cloud_upload_outlined,
-                      title: 'Import from Google Drive',
-                      description: 'Google Drive import is not supported on web. Use device storage instead.',
-                    ),
-                  ],
+                  _buildImportMethodCard(
+                    icon: Icons.cloud_upload_outlined,
+                    title: 'Import from Google Drive',
+                    description: 'Select books from your Google Drive',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GoogleDriveBooksScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -144,30 +140,7 @@ class _FileImportScreenState extends State<FileImportScreen> {
     );
   }
 
-  Widget _buildDisabledCard({
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon, size: 48, color: Colors.grey),
-        title: Text(title, style: const TextStyle(color: Colors.grey)),
-        subtitle: Text(description, style: const TextStyle(color: Colors.grey)),
-        trailing: const Icon(Icons.lock, size: 16, color: Colors.grey),
-        onTap: null,
-      ),
-    );
-  }
-
   Future<void> _handleGoogleSignIn() async {
-    if (kIsWeb) {
-      setState(() {
-        _error = 'Google Sign-In is not supported on web. Use device storage instead.';
-      });
-      return;
-    }
-
     setState(() {
       _isConnecting = true;
       _error = null;
@@ -178,7 +151,7 @@ class _FileImportScreenState extends State<FileImportScreen> {
       if (!mounted) return;
       setState(() {
         _isConnecting = false;
-        if (!success) _error = 'Failed to connect to Google Drive';
+        if (!success) _error = _driveService.lastError ?? 'Failed to connect to Google Drive';
       });
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -280,6 +253,12 @@ class _GoogleDriveBooksScreenState extends State<GoogleDriveBooksScreen> {
   bool _isConnecting = false;
   String? _connectError;
 
+  @override
+  void initState() {
+    super.initState();
+    DriveService().prepare();
+  }
+
   Future<void> _connect() async {
     setState(() {
       _isConnecting = true;
@@ -290,7 +269,7 @@ class _GoogleDriveBooksScreenState extends State<GoogleDriveBooksScreen> {
     setState(() {
       _isConnecting = false;
       _filesFuture = null;
-      if (!success) _connectError = 'Failed to connect to Google Drive';
+      if (!success) _connectError = DriveService().lastError ?? 'Failed to connect to Google Drive';
     });
   }
 

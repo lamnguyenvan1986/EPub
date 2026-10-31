@@ -2,6 +2,11 @@
 
 Các thay đổi quan trọng của LibriAudio. Chi tiết từng lỗi đã sửa xem [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md).
 
+## [1.4.0] - 2026-10-31
+### ✨ Thêm mới
+- Web: giọng offline Piper VAIS1000 chạy ngay trong trình duyệt (onnxruntime-web trong Web Worker), tải 64 MB một lần
+- Web: nhập sách từ Google Drive (xin quyền bằng Google Identity Services); Client ID truyền qua biến repo `GOOGLE_WEB_CLIENT_ID`
+
 ## [1.3.0] - 2026-10-31
 ### ✨ Thêm mới
 - MOBI/AZW: hiện ảnh trong sách (JPEG, PNG, GIF, BMP) đúng vị trí trong chương
