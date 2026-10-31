@@ -5,6 +5,7 @@ import 'package:katbook_epub_reader/katbook_epub_reader.dart';
 import 'package:provider/provider.dart';
 import 'package:libri_audio/models/book_model.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:libri_audio/services/epub_repair.dart';
 import 'package:libri_audio/services/mobi_parser.dart';
 import 'package:libri_audio/services/tts_service.dart';
 import 'package:libri_audio/services/storage_service.dart';
@@ -167,11 +168,26 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
   Future<void> _loadEpub() async {
     final bytes = await _readBookBytes();
 
-    final controller = KatbookEpubController();
-    final success = await controller.openBook(bytes);
+    var controller = KatbookEpubController();
+    var success = await controller.openBook(bytes);
     if (!success) {
+      // Thử sửa lỗi mục lục hay gặp rồi mở lại
+      final repaired = EpubRepair.repair(bytes);
+      if (repaired != null) {
+        final retry = KatbookEpubController();
+        if (await retry.openBook(repaired)) {
+          controller.dispose();
+          controller = retry;
+          success = true;
+        } else {
+          retry.dispose();
+        }
+      }
+    }
+    if (!success) {
+      final reason = controller.loadingError;
       controller.dispose();
-      throw Exception('Không thể đọc file EPUB');
+      throw Exception('Không thể đọc file EPUB${reason != null ? ' ($reason)' : ''}');
     }
     _epubController = controller;
 
