@@ -11,6 +11,10 @@ import 'package:archive/archive.dart';
 ///   "TOC item, not found". Sửa thành `properties="nav"`.
 /// - EPUB 3 không có mục `nav` nhưng có file NCX: đánh dấu là EPUB 2 để
 ///   epubx đọc mục lục từ NCX.
+/// - Manifest khai báo file không có trong zip ("file ... not found in
+///   archive"): nếu có file trùng tên khác hoa/thường hoặc khác mã hoá URL thì
+///   chép sang đúng tên; nếu thiếu hẳn thì thêm file rỗng để vẫn đọc được phần
+///   còn lại của sách.
 ///
 /// Trả về bytes mới, hoặc `null` nếu không có gì để sửa.
 class EpubRepair {
@@ -29,12 +33,13 @@ class EpubRepair {
 
     final opf = utf8.decode(opfFile.content, allowMalformed: true);
     final fixed = fixOpf(opf);
-    if (fixed == null) return null;
+    final added = _missingFiles(archive, opfPath, opf);
+    if (fixed == null && added.isEmpty) return null;
 
     final out = Archive();
     for (final file in archive.files) {
       if (!file.isFile) continue;
-      if (file.name == opfPath) {
+      if (file.name == opfPath && fixed != null) {
         out.addFile(ArchiveFile.bytes(file.name, utf8.encode(fixed)));
       } else {
         final copy = ArchiveFile.bytes(file.name, file.content);
@@ -43,7 +48,60 @@ class EpubRepair {
         out.addFile(copy);
       }
     }
+    added.forEach((name, content) => out.addFile(ArchiveFile.bytes(name, content)));
     return ZipEncoder().encodeBytes(out);
+  }
+
+  static const String _emptyXhtml =
+      '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml">'
+      '<head><title></title></head><body></body></html>';
+
+  /// Các file manifest khai báo nhưng zip không có, tính đường dẫn giống epubx
+  /// (`ZipPathUtils.combine` trên href đã giải mã URL). Trả về tên file cần
+  /// thêm và nội dung.
+  static Map<String, List<int>> _missingFiles(Archive archive, String opfPath, String opf) {
+    final names = {for (final f in archive.files) if (f.isFile) f.name: f};
+    final byLowerName = <String, ArchiveFile>{};
+    for (final f in names.values) {
+      byLowerName.putIfAbsent(_normalize(f.name).toLowerCase(), () => f);
+    }
+    final opfDir = opfPath.contains('/') ? opfPath.substring(0, opfPath.lastIndexOf('/')) : '';
+
+    final added = <String, List<int>>{};
+    final hrefPattern = RegExp(r'''\bhref\s*=\s*(["'])([^"']*)\1''');
+    final typePattern = RegExp(r'''\bmedia-type\s*=\s*(["'])([^"']*)\1''');
+    for (final m in RegExp(r'<item\b[^>]*>').allMatches(opf)) {
+      final item = m.group(0)!;
+      final rawHref = hrefPattern.firstMatch(item)?.group(2);
+      if (rawHref == null || rawHref.isEmpty) continue;
+      final href = rawHref.replaceAll('&amp;', '&');
+
+      final String expected;
+      try {
+        final decoded = Uri.decodeFull(href);
+        expected = Uri.parse(opfDir.isEmpty ? decoded : '$opfDir/$decoded').normalizePath().path;
+      } catch (e) {
+        continue;
+      }
+      if (names.containsKey(expected) || added.containsKey(expected)) continue;
+
+      final match = byLowerName[_normalize(expected).toLowerCase()];
+      if (match != null) {
+        added[expected] = match.content;
+        continue;
+      }
+      final type = typePattern.firstMatch(item)?.group(2) ?? '';
+      added[expected] = type.contains('html') ? utf8.encode(_emptyXhtml) : <int>[];
+    }
+    return added;
+  }
+
+  static String _normalize(String path) {
+    try {
+      return Uri.decodeFull(path);
+    } catch (e) {
+      return path;
+    }
   }
 
   /// Sửa nội dung file OPF; trả về `null` nếu không cần sửa.

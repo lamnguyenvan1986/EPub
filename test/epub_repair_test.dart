@@ -7,9 +7,16 @@ import 'package:katbook_epub_reader/katbook_epub_reader.dart';
 import 'package:libri_audio/services/epub_repair.dart';
 
 /// EPUB 3 tối thiểu; [navProps] là thuộc tính properties của mục nav.
-Uint8List _epub3({String? navProps, bool withNcx = false}) {
+/// [extraItems] thêm vào manifest, [rename] đổi tên file trong zip.
+Uint8List _epub3({
+  String? navProps,
+  bool withNcx = false,
+  String extraItems = '',
+  Map<String, String> rename = const {},
+}) {
   final manifest = StringBuffer()
-    ..write('<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/>');
+    ..write('<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/>')
+    ..write(extraItems);
   if (navProps != null) {
     manifest.write('<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="$navProps"/>');
   }
@@ -30,7 +37,8 @@ Uint8List _epub3({String? navProps, bool withNcx = false}) {
         '<?xml version="1.0"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="x1"/></head><docTitle><text>Sách thử</text></docTitle><navMap><navPoint id="n1" playOrder="1"><navLabel><text>Chương 1</text></navLabel><content src="c1.xhtml"/></navPoint></navMap></ncx>',
   };
   final archive = Archive();
-  files.forEach((name, content) => archive.addFile(ArchiveFile.bytes(name, utf8.encode(content))));
+  files.forEach((name, content) =>
+      archive.addFile(ArchiveFile.bytes(rename[name] ?? name, utf8.encode(content))));
   return ZipEncoder().encodeBytes(archive);
 }
 
@@ -60,6 +68,29 @@ void main() {
     final repaired = EpubRepair.repair(bytes);
     expect(repaired, isNotNull);
     expect(await _opens(repaired!), isTrue);
+  });
+
+  test('manifest khai báo file không có trong zip: thêm file rỗng', () async {
+    final bytes = _epub3(
+      navProps: 'nav',
+      extraItems: '<item id="notes" href="notes.html" media-type="application/xhtml+xml"/>',
+    );
+    expect(await _opens(bytes), isFalse);
+
+    final repaired = EpubRepair.repair(bytes);
+    expect(repaired, isNotNull);
+    expect(await _opens(repaired!), isTrue);
+  });
+
+  test('tên file trong zip khác hoa/thường: chép sang đúng tên, giữ nội dung', () async {
+    final bytes = _epub3(navProps: 'nav', rename: {'OEBPS/c1.xhtml': 'OEBPS/C1.xhtml'});
+    expect(await _opens(bytes), isFalse);
+
+    final repaired = EpubRepair.repair(bytes)!;
+    final controller = KatbookEpubController();
+    expect(await controller.openBook(repaired), isTrue);
+    expect(controller.paragraphs, isNotEmpty);
+    controller.dispose();
   });
 
   test('EPUB hợp lệ thì không cần sửa', () {
