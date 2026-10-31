@@ -9,14 +9,14 @@
 - Đọc EPUB (tự sửa các lỗi mục lục/manifest hay gặp), PDF và MOBI/AZW (không DRM, có ảnh, nén PalmDOC hoặc HUFF/CDIC).
 - Nghe sách: chọn giọng, chỉnh tốc độ và cao độ, đọc tiếp từ vị trí đã dừng, tự chuyển chương.
 - Phát nền trên Android/iOS: thông báo điều khiển, nút tai nghe, màn hình khoá.
-- Nhập sách từ máy hoặc từ Google Drive (chỉ trên Android/iOS).
+- Nhập sách từ máy hoặc từ Google Drive.
 - Tìm kiếm trong sách, chia sẻ file sách, giao diện sáng/tối theo hệ thống.
 
 ## Tình trạng
 
 | Nền tảng | Trạng thái |
 |----------|------------|
-| Web | Chạy được (đọc EPUB/PDF, nghe TTS). Không có Google Drive và phát nền. |
+| Web | Chạy được (đọc EPUB/PDF/MOBI, nghe TTS, giọng offline Piper, Google Drive khi đã cấu hình Client ID). Không phát nền. |
 | Android | Code biên dịch được (`flutter analyze` sạch), chưa thử trên máy thật. |
 | iOS | Thiếu `ios/Runner.xcodeproj`, chưa build được. |
 

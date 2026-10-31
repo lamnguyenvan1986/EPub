@@ -30,12 +30,13 @@ lib/
 │   │   ├── neural_tts_player.dart    # Chia câu, tổng hợp trước câu sau, phát bằng just_audio
 │   │   ├── cloud_tts_engine.dart     # Azure Speech và Google Cloud TTS qua REST
 │   │   ├── offline_voices.dart       # Danh sách giọng Piper tiếng Việt và URL tải
-│   │   ├── offline_tts.dart          # Export có điều kiện: offline_tts_io (mobile) / offline_tts_stub (web)
+│   │   ├── offline_tts.dart          # Export có điều kiện: offline_tts_io (mobile) / offline_tts_web (web)
 │   │   ├── offline_tts_io.dart       # Tải, giải nén giọng; sherpa-onnx chạy trong isolate riêng
+│   │   ├── offline_tts_web.dart      # Gọi window.libriPiper (web/piper/) qua dart:js_interop
 │   │   └── audio_source*.dart        # Bytes -> AudioSource: file tạm (mobile), data URI (web)
 │   ├── mobi_parser.dart          # Đọc MOBI/AZW (PalmDB, nén PalmDOC và HUFF/CDIC), trích text và ảnh theo chương
 │   ├── epub_repair.dart          # Sửa OPF/manifest EPUB lỗi để epubx mở được
-│   ├── drive_service.dart        # Google Sign-In + Drive API (tắt trên web)
+│   ├── drive_service.dart        # Google Sign-In + Drive API (web: chỉ xin quyền qua Google Identity Services)
 │   └── firebase_service.dart     # Chưa được gọi ở đâu, Firebase chưa khởi tạo
 ├── screens/
 │   ├── home_screen.dart          # Danh sách sách
@@ -49,6 +50,8 @@ lib/
     ├── constants.dart
     └── file_picker_web_options_{stub,web}.dart   # Tuỳ chọn file_picker riêng cho web (import có điều kiện)
 ```
+
+Ngoài `lib/`, giọng offline trên web nằm ở `web/piper/`: `piper_bridge.js` (tạo `window.libriPiper`, nạp cùng trang) và `piper_worker.js` (Web Worker chạy espeak-ng + onnxruntime-web). Thư viện trong `web/piper/vendor/` do `tool/fetch_piper_web.sh` tải lúc build.
 
 ## Lưu trữ
 
@@ -66,7 +69,7 @@ lib/
 
 **flutter_secure_storage:** `azure_tts_key`, `google_tts_key` (key API do người dùng nhập).
 
-**Giọng offline** tải về `<app support>/tts_voices/vits-piper-<id>/` (model `.onnx`, `tokens.txt`, `espeak-ng-data`). Audio tạo ra ghi vào `<temp>/tts_audio/`.
+**Giọng offline** tải về `<app support>/tts_voices/vits-piper-<id>/` (model `.onnx`, `tokens.txt`, `espeak-ng-data`). Audio tạo ra ghi vào `<temp>/tts_audio/`. Trên web, model `.onnx` và `.onnx.json` lưu trong Cache Storage `libri-piper-voices` của trình duyệt.
 
 ## Đọc sách
 
@@ -90,7 +93,7 @@ lib/
 | Bộ đọc | Cách chạy | Nền tảng |
 |--------|-----------|----------|
 | Giọng của máy | flutter_tts | Tất cả |
-| Giọng offline (Piper VAIS1000) | sherpa-onnx trong isolate riêng, ghi WAV | Android/iOS (web chưa có) |
+| Giọng offline (Piper VAIS1000) | Mobile: sherpa-onnx trong isolate riêng, ghi WAV. Web: piper_phonemize + onnxruntime-web trong Web Worker, trả WAV | Tất cả |
 | Microsoft Azure | REST `<region>.tts.speech.microsoft.com`, trả MP3 | Tất cả (web chưa thử với key thật) |
 | Google Cloud | REST `texttospeech.googleapis.com` với API key, trả MP3 | Tất cả (CORS cho phép) |
 
@@ -100,6 +103,8 @@ Nếu engine lỗi (thiếu key, mất mạng, chưa tải giọng), `TtsService
 
 `sherpa_onnx` ghim ở 1.13.8: từ 2.0.0 thư viện bỏ espeak-ng nên model Piper không đọc được text thường. Hai giọng Piper tiếng Việt khác (`25hours_single`, `vivos`) không có ký hiệu thanh điệu trong `tokens.txt` nên đọc mất dấu, vì vậy chỉ dùng VAIS1000.
 
+Giọng offline trên web: model tải từ Hugging Face `rhasspy/piper-voices` (GitHub release không cho CORS). Worker dùng espeak-ng gốc của Piper (`@diffusionstudio/piper-wasm`) để đổi text thành phoneme theo `phoneme_id_map` trong `.onnx.json`, rồi chạy model bằng onnxruntime-web 1.18 một luồng (GitHub Pages không bật cross-origin isolation). Trên máy tính, một câu 3 giây tổng hợp mất khoảng 0,5 giây.
+
 Tốc độ: flutter_tts trên Android/iOS coi 0.5 là bình thường, nên `TtsService` nhân tốc độ với 0.5 trên mobile và giữ nguyên trên web.
 
 ## Khác biệt theo nền tảng
@@ -107,8 +112,8 @@ Tốc độ: flutter_tts trên Android/iOS coi 0.5 là bình thường, nên `Tt
 | | Android/iOS | Web |
 |--|-------------|-----|
 | Lưu file sách | Đường dẫn file | Bytes trong Hive (`file_bytes`) |
-| Google Drive | Có (cần OAuth thật) | Tắt |
+| Google Drive | Có (cần OAuth thật) | Có (cần OAuth client Web, xin quyền lại sau khoảng 1 giờ) |
 | Phát nền, màn hình khoá | Có | Không |
-| Giọng offline (sherpa-onnx) | Có (tải 64 MB) | Không |
+| Giọng offline Piper | Có, sherpa-onnx (tải 64 MB) | Có, onnxruntime-web (tải 64 MB + 40 MB thư viện lần đầu) |
 | Giọng cloud Azure/Google | Có | Có (Google đã thử; Azure chưa thử) |
 | Chọn file | file_picker mặc định | Không lọc đuôi, không coi `focus` là huỷ (Safari iOS) |

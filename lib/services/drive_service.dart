@@ -1,6 +1,8 @@
+import 'dart:async' show TimeoutException;
+
 import 'package:flutter/foundation.dart' show ChangeNotifier, kIsWeb;
 import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:googleapis_auth/auth_io.dart' as auth;
+import 'package:googleapis_auth/googleapis_auth.dart' as auth;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -20,29 +22,47 @@ class DriveService extends ChangeNotifier {
     drive.DriveApi.driveReadonlyScope,
   ];
 
+  /// OAuth Client ID loại "Web application" cho bản web. Truyền lúc build:
+  /// `flutter build web --dart-define=GOOGLE_WEB_CLIENT_ID=...`. Để trống thì
+  /// google_sign_in_web đọc thẻ meta `google-signin-client_id` trong web/index.html.
+  static const String webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+
   drive.DriveApi? _driveApi;
   GoogleSignInAccount? _account;
   DateTime? _tokenExpiry;
   Future<void>? _initFuture;
+  String? _lastError;
 
   GoogleSignIn get _googleSignIn => GoogleSignIn.instance;
 
   drive.DriveApi? get driveApi => _driveApi;
   bool get isAuthenticated => _driveApi != null;
 
-  /// Check if Google Sign-In is supported on this platform
-  /// google_sign_in is deprecated on web and will be removed
-  /// Also not supported on Linux - use file picker instead
-  bool get isGoogleSignInSupported => !kIsWeb;
+  /// Lỗi của lần kết nối gần nhất, dạng hiển thị được cho người dùng.
+  String? get lastError => _lastError;
 
   /// google_sign_in 7.x yêu cầu gọi initialize() đúng một lần trước khi dùng.
   Future<void> _ensureInitialized() {
-    return _initFuture ??= _googleSignIn.initialize();
+    return _initFuture ??= _googleSignIn.initialize(
+      clientId: kIsWeb && webClientId.isNotEmpty ? webClientId : null,
+    );
   }
 
+  /// Nạp sẵn thư viện Google trên web, để lúc bấm nút kết nối cửa sổ đăng nhập
+  /// mở ngay (trình duyệt chặn popup mở quá lâu sau cú bấm).
+  Future<void> prepare() async {
+    if (!kIsWeb) return;
+    try {
+      await _ensureInitialized();
+    } catch (e) {
+      print('Error initializing Google Sign-In: $e');
+    }
+  }
+
+  /// Trên web chỉ xin quyền Drive (cửa sổ của Google), không có bước đăng nhập riêng.
   Future<GoogleSignInAccount?> signIn() async {
     if (kIsWeb) {
-      print('Google Sign-In is not supported on web. Use Google Identity Services instead.');
+      await authenticate();
       return null;
     }
     try {
@@ -68,27 +88,53 @@ class DriveService extends ChangeNotifier {
   Future<GoogleSignInAccount?> getCurrentUser() async => _account;
 
   Future<bool> authenticate() async {
-    if (kIsWeb) {
-      print('Google Sign-In is not supported on web. Use Google Identity Services instead.');
-      return false;
-    }
-
     try {
       // Check if already authenticated
       if (_driveApi != null) return true;
+      _lastError = null;
 
-      await _ensureInitialized();
-      _account = await _googleSignIn.authenticate();
+      // Web tải thư viện Google Identity Services từ accounts.google.com; nếu mạng
+      // chặn thì initialize() không bao giờ xong, nên đặt giới hạn thời gian.
+      await _ensureInitialized().timeout(const Duration(seconds: 20));
+      final GoogleSignInAuthorizationClient authorizationClient;
+      if (kIsWeb) {
+        // google_sign_in_web không hỗ trợ authenticate(); authorizeScopes() mở
+        // cửa sổ chọn tài khoản và cấp quyền của Google Identity Services.
+        authorizationClient = _googleSignIn.authorizationClient;
+      } else {
+        _account = await _googleSignIn.authenticate();
+        authorizationClient = _account!.authorizationClient;
+      }
 
       // Get access token for Drive API using authorizationClient
-      final authz = await _account!.authorizationClient.authorizeScopes(_scopes);
+      final authz = await authorizationClient.authorizeScopes(_scopes);
       _setAccessToken(authz.accessToken);
       notifyListeners();
       return true;
     } catch (error) {
       print('Error authenticating: $error');
+      _lastError = _describeError(error);
       return false;
     }
+  }
+
+  static String _describeError(Object error) {
+    if (error is TimeoutException) {
+      return 'Không tải được thư viện đăng nhập Google. Kiểm tra mạng rồi thử lại.';
+    }
+    if (error is GoogleSignInException) {
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        return 'Đã huỷ đăng nhập Google.';
+      }
+      final detail = '${error.description ?? ''} ${error.details ?? ''}';
+      if (detail.contains('popup')) {
+        return 'Trình duyệt chặn cửa sổ đăng nhập Google. Cho phép popup rồi bấm kết nối lại.';
+      }
+    }
+    if (kIsWeb && (error is AssertionError || error is TypeError)) {
+      return 'Bản web chưa có Google Client ID (xem docs/SETUP.md).';
+    }
+    return 'Không kết nối được Google Drive: $error';
   }
 
   void _setAccessToken(String token) {
@@ -110,7 +156,9 @@ class DriveService extends ChangeNotifier {
     if (expiry != null && DateTime.now().isBefore(expiry)) return true;
 
     try {
-      final authz = await _account?.authorizationClient.authorizationForScopes(_scopes);
+      // Web không có _account: lấy token đã cấp từ authorizationClient chung
+      final client = kIsWeb ? _googleSignIn.authorizationClient : _account?.authorizationClient;
+      final authz = await client?.authorizationForScopes(_scopes);
       if (authz == null) {
         // Cần người dùng đăng nhập lại
         _driveApi = null;

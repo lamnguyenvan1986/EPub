@@ -13,6 +13,7 @@ Flutter app đọc EPUB, PDF, MOBI/AZW và nghe sách bằng TTS (mặc định 
 flutter pub get
 flutter analyze
 flutter test
+./tool/fetch_piper_web.sh            # thư viện giọng offline cho web (trước khi chạy/build web)
 flutter build web --release
 flutter pub run build_runner build   # sau khi sửa model Hive
 ```

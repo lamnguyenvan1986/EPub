@@ -26,8 +26,13 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      # Đóng gói CanvasKit cùng app (không tải từ gstatic) để chạy cả khi mạng chặn CDN
-      - run: flutter build web --release --base-href /EPub/ --no-wasm-dry-run --no-web-resources-cdn
+      # Thư viện giọng offline trên web (onnxruntime-web, piper_phonemize) vào web/piper/vendor/
+      - run: ./tool/fetch_piper_web.sh
+      # Đóng gói CanvasKit cùng app (không tải từ gstatic) để chạy cả khi mạng chặn CDN.
+      # GOOGLE_WEB_CLIENT_ID: biến repo (Settings > Secrets and variables > Actions > Variables)
+      - run: >-
+          flutter build web --release --base-href /EPub/ --no-wasm-dry-run --no-web-resources-cdn
+          --dart-define=GOOGLE_WEB_CLIENT_ID=${{ vars.GOOGLE_WEB_CLIENT_ID }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web

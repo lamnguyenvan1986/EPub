@@ -39,7 +39,7 @@ class TtsEngineSettings extends StatelessWidget {
         if (!tts.offlineSupported)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text('Giọng offline chỉ có trên app Android/iOS.'),
+            child: Text('Trình duyệt này không chạy được giọng offline.'),
           ),
         const Divider(),
         if (tts.engineType == TtsEngineType.offline) const _OfflineVoices(),
