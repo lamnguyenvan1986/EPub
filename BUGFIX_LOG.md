@@ -118,3 +118,11 @@ Trên web: Google Drive bị tắt (chưa hỗ trợ đăng nhập), không phá
 | 45 | `lib/screens/file_import_screen.dart`, `lib/utils/file_picker_web_options_*.dart` | Trên Safari iOS, chọn file báo "No file selected": file_picker coi sự kiện `focus` của cửa sổ (Safari gửi trước khi file từ ứng dụng Tệp sao chép xong) là huỷ; bộ lọc `accept` theo đuôi còn làm mờ file .mobi/.azw | Trên web: `cancelUploadOnWindowBlur: false` (chỉ coi là huỷ khi có sự kiện `cancel`), bỏ bộ lọc đuôi, tự kiểm tra đuôi sau khi chọn và báo lỗi nếu không hỗ trợ. Tuỳ chọn web dùng import có điều kiện để bản mobile vẫn biên dịch |
 
 Kiểm tra: Playwright giả lập Safari (gửi `focus` trước khi chọn file 1,5 giây): nhập EPUB thành công, file `.txt` hiện lỗi "Unsupported file". `flutter test` → 27/27 pass. Chưa thử trên iPhone thật.
+
+### Đợt 6 (2026-10-31): "Không thể đọc file EPUB"
+
+| # | File | Lỗi | Cách sửa |
+|---|------|-----|----------|
+| 46 | `lib/services/epub_repair.dart`, `lib/screens/book_reader_screen.dart` | epubx (trong katbook_epub_reader) từ chối nhiều EPUB 3 thực tế: mục `nav` có `properties="nav scripted"`/`"cover-image nav"`, hoặc EPUB 3 chỉ có NCX → "TOC item, not found in EPUB manifest". Màn đọc chỉ báo "Không thể đọc file EPUB", không rõ lý do | Khi mở lỗi: sửa OPF (`properties="nav"`, hoặc đánh dấu EPUB 2 để dùng NCX), nén lại rồi mở lại. Thông báo lỗi kèm lý do từ thư viện |
+
+Kiểm tra: 34 EPUB mẫu của epubx: trước 31/34 mở được, sau 33/34 (còn `svg-in-spine.epub`: trang SVG trong spine). Test mới `test/epub_repair_test.dart` (4 case). `flutter test` → 31/31 pass. Bản web trên Chromium mở được `trees.epub` nhờ sửa.
