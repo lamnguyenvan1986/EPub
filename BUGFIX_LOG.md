@@ -124,5 +124,6 @@ Kiểm tra: Playwright giả lập Safari (gửi `focus` trước khi chọn fil
 | # | File | Lỗi | Cách sửa |
 |---|------|-----|----------|
 | 46 | `lib/services/epub_repair.dart`, `lib/screens/book_reader_screen.dart` | epubx (trong katbook_epub_reader) từ chối nhiều EPUB 3 thực tế: mục `nav` có `properties="nav scripted"`/`"cover-image nav"`, hoặc EPUB 3 chỉ có NCX → "TOC item, not found in EPUB manifest". Màn đọc chỉ báo "Không thể đọc file EPUB", không rõ lý do | Khi mở lỗi: sửa OPF (`properties="nav"`, hoặc đánh dấu EPUB 2 để dùng NCX), nén lại rồi mở lại. Thông báo lỗi kèm lý do từ thư viện |
+| 47 | `lib/services/epub_repair.dart` | EPUB của Lam: manifest khai báo `OEBPS/notes.html` nhưng zip không có → "file ... not found in archive" | Khi sửa: file trùng tên khác hoa/thường hoặc mã hoá URL thì chép sang đúng tên; thiếu hẳn thì thêm file rỗng |
 
 Kiểm tra: 34 EPUB mẫu của epubx: trước 31/34 mở được, sau 33/34 (còn `svg-in-spine.epub`: trang SVG trong spine). Test mới `test/epub_repair_test.dart` (4 case). `flutter test` → 31/31 pass. Bản web trên Chromium mở được `trees.epub` nhờ sửa.
