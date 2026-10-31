@@ -110,3 +110,11 @@ Chưa chạy được trên thiết bị: `google-services.json` và `GoogleServ
 
 Kiểm tra: `flutter build web` thành công; chạy bản build trong Chromium (Playwright): nhập và đọc EPUB/PDF, nút đọc to dùng giọng `vi-VN`, sách còn sau khi tải lại trang. `flutter test` → 27/27 pass.
 Trên web: Google Drive bị tắt (chưa hỗ trợ đăng nhập), không phát nền / điều khiển màn hình khoá.
+
+### Đợt 5 (2026-10-31): Chọn file trên Safari iOS
+
+| # | File | Lỗi | Cách sửa |
+|---|------|-----|----------|
+| 45 | `lib/screens/file_import_screen.dart`, `lib/utils/file_picker_web_options_*.dart` | Trên Safari iOS, chọn file báo "No file selected": file_picker coi sự kiện `focus` của cửa sổ (Safari gửi trước khi file từ ứng dụng Tệp sao chép xong) là huỷ; bộ lọc `accept` theo đuôi còn làm mờ file .mobi/.azw | Trên web: `cancelUploadOnWindowBlur: false` (chỉ coi là huỷ khi có sự kiện `cancel`), bỏ bộ lọc đuôi, tự kiểm tra đuôi sau khi chọn và báo lỗi nếu không hỗ trợ. Tuỳ chọn web dùng import có điều kiện để bản mobile vẫn biên dịch |
+
+Kiểm tra: Playwright giả lập Safari (gửi `focus` trước khi chọn file 1,5 giây): nhập EPUB thành công, file `.txt` hiện lỗi "Unsupported file". `flutter test` → 27/27 pass. Chưa thử trên iPhone thật.

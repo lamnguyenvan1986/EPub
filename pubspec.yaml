@@ -13,6 +13,7 @@ dependencies:
   googleapis_auth: ^2.3.3
   http: ^1.2.0
   file_picker: ^13.1.0
+  file_picker_web: ^4.2.0  # Tuỳ chọn riêng cho web (Safari iOS)
   # EPUB & PDF
   katbook_epub_reader: ^2.1.2
   pdfrx: ^2.6.1
