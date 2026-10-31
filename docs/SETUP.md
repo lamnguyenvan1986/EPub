@@ -79,7 +79,7 @@ Bản web xin quyền Drive bằng Google Identity Services (cửa sổ popup c�
 3. *Credentials > Create credentials > OAuth client ID > Web application*. Ở **Authorized JavaScript origins** thêm `https://lamnguyenvan1986.github.io` (không có `/EPub`), và `http://localhost:8080` nếu chạy thử bằng `flutter run -d chrome --web-port 8080`. Không cần Redirect URI.
 4. Copy Client ID (dạng `xxxx.apps.googleusercontent.com`) vào biến repo `GOOGLE_WEB_CLIENT_ID` (*Settings > Secrets and variables > Actions > Variables > New repository variable*), rồi chạy lại workflow *Deploy web*.
 
-Nếu không đặt biến này, app dùng Client ID trong thẻ `<meta name="google-signin-client_id">` của `web/index.html` (giá trị có từ đầu repo, không rõ có cho phép origin github.io không). Khi app còn ở chế độ Testing, Google hiện cảnh báo "app chưa xác minh"; bấm *Tiếp tục* là dùng được với tài khoản test.
+Nếu không đặt biến này, app dùng Client ID trong thẻ `<meta name="google-signin-client_id">` của `web/index.html`. Đây là Client ID Web của Lam (`577711935566-ru5fvsii1r4jrgsckg8ku22vgq48anrt`), nên bản trên GitHub Pages không cần đặt biến; chỉ cần client có origin `https://lamnguyenvan1986.github.io`. Khi app còn ở chế độ Testing, Google hiện cảnh báo "app chưa xác minh"; bấm *Tiếp tục* là dùng được với tài khoản test.
 
 ### Android/iOS
 
