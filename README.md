@@ -1,104 +1,45 @@
-# LibriAudio - Ứng dụng Đọc sách & Nghe Audio
+# LibriAudio
 
-Một ứng dụng Flutter đầy đủ tính năng để đọc sách điện tử (PDF, EPUB) và nghe audio với hỗ trợ text-to-speech, lưu vị trí, chọn giọng đọc, đánh dấu, ghi chú và đồng bộ với Firebase.
+Ứng dụng Flutter để đọc sách điện tử (EPUB, PDF, MOBI/AZW) và nghe sách bằng giọng đọc máy (text-to-speech), mặc định giọng tiếng Việt.
 
-## 📚 **Tài liệu**
+**Bản web:** https://lamnguyenvan1986.github.io/EPub/ (tự build và cập nhật mỗi khi có commit lên `main`).
 
-- [📖 AI Claude Documentation](./docs/AI_CLAUDE_DOCUMENTATION.md) - Tài liệu kỹ thuật cho AI/Code Interpreter
-- [📁 Cấu trúc Thư mục](./docs/APP_FOLDER_STRUCTURE.md) - Cấu trúc thư mục chi tiết
-- [📄 README](./docs/README.md) - README gốc
+## Tính năng
 
-## 🚀 Tính năng chính
+- Đọc EPUB (tự sửa các lỗi mục lục/manifest hay gặp), PDF và MOBI/AZW (không DRM).
+- Nghe sách: chọn giọng, chỉnh tốc độ và cao độ, đọc tiếp từ vị trí đã dừng, tự chuyển chương.
+- Phát nền trên Android/iOS: thông báo điều khiển, nút tai nghe, màn hình khoá.
+- Nhập sách từ máy hoặc từ Google Drive (chỉ trên Android/iOS).
+- Tìm kiếm trong sách, chia sẻ file sách, giao diện sáng/tối theo hệ thống.
 
-### 📖 Đọc sách
-- Hỗ trợ PDF, EPUB, MOBI
-- Giao diện đọc dễ đọc với điều chỉnh font, cỡ chữ
-- Chuyển trang mượt mà
+## Tình trạng
 
-### 🔊 Audio & Text-to-Speech
-- Phát audio từ nội dung sách (EPUB)
-- Chọn giọng đọc (nhiều ngôn ngữ)
-- Điều chỉnh tốc độ đọc (0.5x - 2.0x)
-- Lưu vị trí đọc
+| Nền tảng | Trạng thái |
+|----------|------------|
+| Web | Chạy được (đọc EPUB/PDF, nghe TTS). Không có Google Drive và phát nền. |
+| Android | Code biên dịch được (`flutter analyze` sạch), chưa thử trên máy thật. |
+| iOS | Thiếu `ios/Runner.xcodeproj`, chưa build được. |
 
-### ☁️ Đồng bộ & Đa thiết bị
-- Đồng bộ với Firebase
-- Đánh dấu & ghi chú
-- Truy cập từ nhiều thiết bị
+Google Drive cần cấu hình OAuth client thật mới đăng nhập được, xem [docs/SETUP.md](docs/SETUP.md#google-drive).
 
-### 🎨 Giao diện
-- Light/Dark mode
-- Tùy chỉnh chủ đề
-- Hiệu ứng âm thanh trực quan
-
-## 📦 Cài đặt
-
-### 1. Yêu cầu
-- Flutter SDK >= 3.0.0
-- Dart SDK >= 3.0.0
-- Firebase account (cho tính năng đồng bộ)
-
-### 2. Cài đặt dependencies
+## Bắt đầu nhanh
 
 ```bash
 flutter pub get
+flutter run -d chrome   # hoặc flutter run cho Android
+flutter test
 ```
 
-### 3. Cấu hình Android & iOS
-Xem chi tiết tại [AI Claude Documentation](./docs/AI_CLAUDE_DOCUMENTATION.md)
+## Tài liệu
 
-### 4. Chạy ứng dụng
+| Tài liệu | Nội dung |
+|----------|----------|
+| [docs/SETUP.md](docs/SETUP.md) | Cài đặt, chạy, test, build, deploy web, cấu hình Google Drive |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Cấu trúc thư mục, các lớp, lưu trữ, luồng đọc và TTS |
+| [CHANGELOG.md](CHANGELOG.md) | Các phiên bản và thay đổi |
+| [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md) | Nhật ký sửa lỗi chi tiết |
+| [CLAUDE.md](CLAUDE.md) | Hướng dẫn cho Claude Code khi làm việc với repo |
 
-```bash
-flutter run
-```
+## License
 
-## 📁 Cấu trúc project
-
-Xem [Cấu trúc Thư mục](./docs/APP_FOLDER_STRUCTURE.md) để biết chi tiết.
-
-## 🔌 Tính năng nâng cao
-
-- Text-to-Speech với Google Cloud (tùy chọn)
-- Đánh dấu & ghi chú
-- Playlist đọc sách
-- Tìm kiếm trong sách
-- Export/Share sách
-
-# 🧪 Tests
-
-## Chạy Tests
-
-```bash
-# Chạy toàn bộ test suite
-./run_tests.sh
-
-# Hoặc chạy manual
-flutter pub get
-flutter test test/models_test.dart
-flutter test test/tts_split_test.dart
-```
-
-## Loại Tests
-
-| File | Mô tả | Mức độ |
-|------|-------|--------|
-| `test/models_test.dart` | Unit tests cho Models | ⭐⭐ |
-| `test/tts_split_test.dart` | Unit tests chia đoạn TTS | ⭐⭐ |
-
-Xem chi tiết tại [test/README.md](test/README.md)
-
----
-
-## 📝 License
-
-MIT License
-
-## 📝 License
-
-MIT License
-
-## 👥 Author
-
-Created with ❤️ by LibriAudio Team
-# EPub
+MIT

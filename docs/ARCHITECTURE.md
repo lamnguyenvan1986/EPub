@@ -1,269 +1,82 @@
-# 🏗️ Kiến trúc Ứng dụng LibriAudio
+# Kiến trúc
 
-## 📐 **Clean Architecture Overview**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     PRESENTATION LAYER                       │
-│  Screens (Views)  Widgets (UI Components)                   │
-│  • HomeScreen  • BookReaderScreen  • FileImportScreen      │
-│  • SearchScreen  • SettingsScreen                            │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                     BUSINESS LOGIC LAYER                     │
-│  Providers (State Management)  Use Cases                    │
-│  • BookProvider  • ThemeProvider                            │
-│  • HighlightProvider  • PlaylistProvider                    │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                       DATA LAYER                            │
-│  Repositories  Services  Data Sources                       │
-│  • StorageService  • TtsService  • DriveService            │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 📁 **Layer Chi tiết**
-
-### **1. Presentation Layer (UI)**
-
-#### **Screens** (Màn hình)
-- `HomeScreen` - Danh sách sách, tìm kiếm
-- `BookReaderScreen` - Đọc sách, phát audio
-- `FileImportScreen` - Import từ Drive/Device
-- `SearchScreen` - Tìm kiếm trong sách
-- `SettingsScreen` - Cài đặt ứng dụng
-
-#### **Widgets** (Thành phần UI)
-- `BookItem` - Item trong danh sách sách
-- `VoiceSelector` - Chọn giọng đọc
-- `AudioVisualizer` - Hiệu ứng âm thanh
-- `HighlightWidget` - Hiển thị đánh dấu
-- `AudioFloatingControls` - Điều khiển nổi khi phát audio
-
-### **2. Business Logic Layer**
-
-#### **Providers** (State Management)
-- `BookProvider` - Quản lý danh sách sách
-- `ThemeProvider` - Quản lý theme (dark/light)
-- `HighlightProvider` - Quản lý đánh dấu & ghi chú
-- `PlaylistProvider` - Quản lý playlist
-
-#### **Services** (Xử lý nghiệp vụ)
-- `StorageService` - Lưu trữ dữ liệu (Hive, SharedPreferences)
-- `TtsService` - Xử lý Text-to-Speech
-- `AudioPlayerService` - Xử lý phát audio
-- `DriveService` - Kết nối Google Drive
-- `FirebaseService` - Đồng bộ Firebase
-
-### **3. Data Layer**
-
-#### **Models** (Data Models)
-- `Book` - Thông tin sách
-- `ReadingState` - Vị trí đọc cuối cùng
-- `Highlight` - Đánh dấu & ghi chú
-- `Playlist` - Danh sách nghe
-
-#### **Storage**
-- `Hive` - Local database
-- `SharedPreferences` - Cấu hình đơn giản
-- `Firebase` - Cloud sync (tùy chọn)
-
----
-
-## 🔄 **Data Flow**
+App dùng Flutter với `provider` + `ChangeNotifier`. Màn hình đọc state từ provider; provider và màn hình gọi xuống các service (singleton) để đọc file, lưu dữ liệu và phát TTS.
 
 ```
-User Interaction
-        ↓
-   Screen/Widget
-        ↓
-   Provider (State)
-        ↓
-   Service (Business Logic)
-        ↓
-   Data Source (Hive/Firebase/API)
-        ↓
-   Update UI (Provider.notifyListeners())
+Screens / Widgets  ──watch──▶  Providers (ChangeNotifier)
+        │                             │
+        └──────────────┬──────────────┘
+                       ▼
+                   Services  ──▶  Hive, SharedPreferences, flutter_tts, audio_service, Google Drive
 ```
 
----
-
-## 🎯 **Design Patterns**
-
-### **1. Provider Pattern**
-- `ChangeNotifier` cho state management
-- `Consumer` để rebuild UI khi state thay đổi
-
-### **2. Service Pattern**
-- `StorageService` - Singleton cho database
-- `TtsService` - Singleton cho audio
-- `DriveService` - Singleton cho Google Drive
-
-### **3. Repository Pattern**
-- `StorageService` đóng vai trò Repository
-- Abstract data sources (Hive, SharedPreferences)
-
----
-
-## 🔌 **Dependencies Injection**
-
-```dart
-MultiProvider(
-  providers: [
-    ChangeNotifierProvider(create: (_) => BookProvider()),
-    ChangeNotifierProvider(create: (_) => ThemeProvider()),
-    ChangeNotifierProvider(create: (_) => TtsService()),
-    ChangeNotifierProvider(create: (_) => AudioPlayerService()),
-    ChangeNotifierProvider(create: (_) => DriveService()),
-  ],
-  child: MyApp(),
-)
-```
-
----
-
-## 🗄️ **Database Schema**
-
-### **Hive Boxes**
-
-| Box Name | Model | Description |
-|----------|-------|-------------|
-| `books` | `Book` | Danh sách sách đã import |
-| `reading_states` | `ReadingState` | Vị trí đọc cuối cùng |
-| `highlights` | `Highlight` | Đánh dấu & ghi chú |
-| `playlists` | `Playlist` | Danh sách nghe |
-
-### **SharedPreferences Keys**
-
-| Key | Type | Default |
-|-----|------|---------|
-| `voice_id` | String | `''` |
-| `reading_speed` | double | `1.0` |
-| `dark_mode` | bool | `false` |
-| `last_dir` | String | `''` |
-
----
-
-## 🎨 **Theme System**
-
-### **Light Theme**
-```dart
-ThemeData(
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: AppColors.primary,  // #6750A4
-    brightness: Brightness.light,
-  ),
-  scaffoldBackgroundColor: AppColors.background,
-)
-```
-
-### **Dark Theme**
-```dart
-ThemeData(
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: AppColors.primary,
-    brightness: Brightness.dark,
-  ),
-  scaffoldBackgroundColor: const Color(0xFF1C1B1F),
-)
-```
-
----
-
-## 🔊 **Audio Architecture**
+## Thư mục `lib/`
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Audio Player Layer                        │
-│  just_audio (Playback Engine)                               │
-│  • Play  • Pause  • Stop  • Seek                            │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                  WakeLock Service                            │
-│  wakelock_plus (Prevent sleep)                              │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    TTS Service                               │
-│  flutter_tts (Text-to-Speech)                               │
-│  • Speak  • Pause  • Resume  • Stop                         │
-└─────────────────────────────────────────────────────────────┘
+lib/
+├── main.dart                     # Khởi tạo StorageService, TtsService, AudioService; đăng ký provider
+├── models/                       # Book, Highlight, Playlist (Hive, file .g.dart sinh tự động)
+├── providers/
+│   ├── book_provider.dart        # Thư viện sách: thêm/xoá, tiến độ đọc, nhập từ Drive
+│   ├── theme_provider.dart       # Sáng/tối/theo hệ thống
+│   ├── highlight_provider.dart   # Đánh dấu và ghi chú (đã đăng ký, chưa có UI dùng)
+│   └── playlist_provider.dart    # Danh sách nghe (đã đăng ký, chưa có UI dùng)
+├── services/
+│   ├── storage_service.dart      # Hive box + SharedPreferences
+│   ├── tts_service.dart          # flutter_tts: hàng đợi đoạn, tốc độ, giọng, chia đoạn
+│   ├── tts_audio_handler.dart    # audio_service: thông báo, tai nghe, màn hình khoá
+│   ├── mobi_parser.dart          # Đọc MOBI/AZW (PalmDB, nén PalmDOC), trích text theo chương
+│   ├── epub_repair.dart          # Sửa OPF/manifest EPUB lỗi để epubx mở được
+│   ├── drive_service.dart        # Google Sign-In + Drive API (tắt trên web)
+│   └── firebase_service.dart     # Chưa được gọi ở đâu, Firebase chưa khởi tạo
+├── screens/
+│   ├── home_screen.dart          # Danh sách sách
+│   ├── file_import_screen.dart   # Nhập từ máy hoặc Google Drive
+│   ├── book_reader_screen.dart   # Đọc EPUB/PDF/MOBI và chế độ nghe
+│   ├── search_screen.dart        # Tìm trong nội dung text của sách
+│   └── settings_screen.dart      # Giọng, tốc độ, cao độ, theme
+├── widgets/                      # book_item, pdf_viewer (pdfrx), voice_selector, audio_*, highlight_widget
+└── utils/
+    ├── constants.dart
+    └── file_picker_web_options_{stub,web}.dart   # Tuỳ chọn file_picker riêng cho web (import có điều kiện)
 ```
 
----
+## Lưu trữ
 
-## 🔒 **Security Considerations**
+**Hive boxes** (mở trong `StorageService.init()`):
 
-### **1. Google Drive API**
-- OAuth 2.0 authentication
-- Store tokens securely (Flutter Secure Storage)
-- Request only necessary scopes
+| Box | Nội dung |
+|-----|----------|
+| `books` | Thông tin sách |
+| `reading_states` | Vị trí đọc theo sách |
+| `highlights` | Đánh dấu, ghi chú |
+| `playlists` | Danh sách nghe |
+| `file_bytes` | Nội dung file sách trên web (không có đường dẫn file) |
 
-### **2. Local Storage**
-- Hive: Encrypt sensitive data
-- SharedPreferences: No sensitive data
+**SharedPreferences:** `voice_id`, `reading_speed`, `pitch`, `theme_mode`, `last_dir`.
 
-### **3. Firebase**
-- Authentication required for sync
-- Firestore security rules
+## Đọc sách
 
----
+`BookReaderScreen._loadBook()` lấy bytes file (từ đường dẫn, hoặc box `file_bytes` trên web) rồi chọn theo loại:
 
-## 🚀 **Performance Optimization**
+- **EPUB:** `katbook_epub_reader` (bên trong là epubx). Nếu mở lỗi, `EpubRepair.repair()` sửa OPF/manifest và mở lại; nếu vẫn lỗi thì hiện lý do từ thư viện.
+- **PDF:** `pdfrx` để hiển thị và trích text.
+- **MOBI/AZW:** `MobiParser` trích text theo chương, hiển thị bằng text reader của app. Không hỗ trợ DRM, nén HUFF/CDIC và ảnh.
 
-### **1. Lazy Loading**
-- EPUB chapters load on-demand
-- Image lazy loading
+## Luồng nghe (TTS)
 
-### **2. Caching**
-- Audio files cache
-- Book metadata cache
+1. `_buildSegments()` lấy text theo chương/đoạn và chia bằng `TtsService.splitText` (giới hạn độ dài của engine Android).
+2. `TtsService.speakQueue()` đọc lần lượt từng đoạn; khi một đoạn xong thì đọc đoạn tiếp, màn hình cập nhật vị trí qua callback và lưu tiến độ.
+3. Trên Android/iOS, `TtsAudioHandler` (audio_service) hiện thông báo, nhận play/pause/next/prev từ tai nghe và màn hình khoá. `wakelock_plus` giữ máy không ngủ khi đang nghe.
+4. Trên web, trước lần đọc đầu tiên app tải lại danh sách giọng của trình duyệt để chọn đúng giọng `vi-VN`.
 
-### **3. Background Processing**
-- Audio playback in foreground service
-- WakeLock for screen off
+Tốc độ: flutter_tts trên Android/iOS coi 0.5 là bình thường, nên `TtsService` nhân tốc độ với 0.5 trên mobile và giữ nguyên trên web.
 
----
+## Khác biệt theo nền tảng
 
-## 📱 **Platform-Specific**
-
-### **Android**
-- Foreground service for audio
-- FileProvider for file sharing
-- Permissions: `FOREGROUND_SERVICE`, `WAKE_LOCK`
-
-### **iOS**
-- Background modes: `audio`, `fetch`
-- AVAudioSession configuration
-- Info.plist permissions
-
----
-
-## 🧪 **Testing Strategy**
-
-| Type | Files | Description |
-|------|-------|-------------|
-| Unit Test | `services/*.dart` | Test business logic |
-| Widget Test | `widgets/*.dart` | Test UI components |
-| Integration | - | Test full flow (TBD) |
-
----
-
-## 🔄 **Future Architecture Improvements**
-
-| Feature | Current | Target |
-|---------|---------|--------|
-| State Management | Provider | Riverpod + Freezed |
-| Navigation | Navigator 1.0 | GoRouter |
-| DI | Manual | GetIt + Inject |
-| Data Layer | Hive | Floor (SQLite) |
-
----
-
-**Last Updated**: 2026-09-07
-**Version**: 1.0.0
+| | Android/iOS | Web |
+|--|-------------|-----|
+| Lưu file sách | Đường dẫn file | Bytes trong Hive (`file_bytes`) |
+| Google Drive | Có (cần OAuth thật) | Tắt |
+| Phát nền, màn hình khoá | Có | Không |
+| Chọn file | file_picker mặc định | Không lọc đuôi, không coi `focus` là huỷ (Safari iOS) |
