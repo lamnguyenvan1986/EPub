@@ -93,6 +93,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
     _tts.onQueueCompleted = null;
     _tts.onSkipNext = null;
     _tts.onSkipPrevious = null;
+    _tts.onEngineError = null;
     if (_audioStarted) {
       _tts.stop();
     }
@@ -685,6 +686,10 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
     _tts.onQueueCompleted = null;
     _tts.onSkipNext = () => _jumpSectionAudio(1);
     _tts.onSkipPrevious = () => _jumpSectionAudio(-1);
+    _tts.onEngineError = (message) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    };
     _audioStarted = true;
     await _tts.speakQueue(segments.map((s) => s.text).toList(), startIndex: start);
   }

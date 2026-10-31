@@ -23,6 +23,11 @@ dependencies:
   flutter_tts: ^4.0.2  # Hỗ trợ tiếng Việt tốt nhất (miễn phí)
   audio_service: ^0.18.13  # Phát TTS nền + thông báo điều khiển
   wakelock_plus: ^1.1.3  # Tắt tự động sleep khi nghe audio
+  # TTS offline (giọng Piper tiếng Việt). Ghim 1.13.8: từ 2.0.0 sherpa-onnx bỏ espeak-ng
+  # nên model Piper không đọc được text thường nữa.
+  sherpa_onnx: 1.13.8
+  just_audio: ^0.10.6  # Phát audio do TTS offline/cloud tạo ra
+  audio_session: ^0.2.2  # Category playback cho just_audio (phát khi khoá màn hình)
   # Persistence
   hive: ^2.2.3
   hive_flutter: ^1.1.0

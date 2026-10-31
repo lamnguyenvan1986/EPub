@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:libri_audio/screens/tts_settings_screen.dart';
 import 'package:libri_audio/providers/book_provider.dart';
 import 'package:libri_audio/providers/theme_provider.dart';
 import 'package:libri_audio/models/book_model.dart';
@@ -226,6 +227,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                 ],
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.record_voice_over),
+                title: const Text('Giọng đọc'),
+                subtitle: Text(context.watch<TtsService>().engineType.label),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => TtsSettingsScreen.open(context),
               ),
             ],
           ),
