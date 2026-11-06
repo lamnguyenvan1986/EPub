@@ -3,6 +3,9 @@
 Các thay đổi quan trọng của LibriAudio. Chi tiết từng lỗi đã sửa xem [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md).
 
 ## [1.5.0] - 2026-11-06
+### 🐛 Sửa lỗi
+- Android: đăng nhập Google dùng Client ID Web làm serverClientId, không còn phụ thuộc `google-services.json` mẫu
+
 ### ✨ Thêm mới
 - Trình đọc chung cho EPUB, MOBI/AZW và PDF dạng chữ: cùng tùy chọn hiển thị (nút Tt) gồm cuộn hoặc lật trang, phông có chân/không chân, cỡ chữ, giãn dòng, lề, căn đều, nền trắng/giấy cũ/tối/theo app; tùy chọn được lưu lại
 - EPUB đọc bằng parser riêng (không dùng katbook_epub_reader): có ảnh, tiêu đề, tên chương từ mục lục, vẫn mở được các file lỗi trước đây cần tự sửa; EPUB có DRM báo rõ
