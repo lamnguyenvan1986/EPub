@@ -4,7 +4,7 @@ import 'package:libri_audio/services/drive_service.dart';
 void main() {
   group('DriveService.isBookFileName', () {
     test('nhận các đuôi sách', () {
-      for (final name in ['a.pdf', 'b.EPUB', 'c.mobi', 'd.azw', 'e.AZW3']) {
+      for (final name in ['a.pdf', 'b.EPUB', 'c.mobi', 'd.azw', 'e.AZW3', 'f.prc', 'g.PRC']) {
         expect(DriveService.isBookFileName(name), isTrue, reason: name);
       }
     });
@@ -20,6 +20,13 @@ void main() {
     test('file AZW3 bị Drive gán octet-stream được nhận là MOBI', () {
       expect(
         DriveService.resolveBookMimeType('book.azw3', 'application/octet-stream'),
+        'application/x-mobipocket-ebook',
+      );
+    });
+
+    test('file PRC được nhận là MOBI', () {
+      expect(
+        DriveService.resolveBookMimeType('truyen.prc', 'application/octet-stream'),
         'application/x-mobipocket-ebook',
       );
     });

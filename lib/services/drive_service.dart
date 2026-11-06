@@ -198,7 +198,7 @@ class DriveService extends ChangeNotifier {
     'application/octet-stream',
   ];
 
-  static const List<String> _bookExtensions = ['.pdf', '.epub', '.mobi', '.azw', '.azw3'];
+  static const List<String> _bookExtensions = ['.pdf', '.epub', '.mobi', '.azw', '.azw3', '.prc'];
 
   static bool isBookFileName(String name) {
     final lower = name.toLowerCase();
@@ -353,7 +353,7 @@ class DriveService extends ChangeNotifier {
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['epub', 'pdf', 'mobi', 'azw', 'azw3'],
+        allowedExtensions: ['epub', 'pdf', 'mobi', 'azw', 'azw3', 'prc'],
       );
 
       if (result.isEmpty) {
@@ -389,7 +389,7 @@ class DriveService extends ChangeNotifier {
   Future<String?> _pickFileFromDeviceMobile() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['epub', 'pdf', 'mobi', 'azw', 'azw3'],
+      allowedExtensions: ['epub', 'pdf', 'mobi', 'azw', 'azw3', 'prc'],
     );
 
     if (result.isEmpty) {
@@ -426,6 +426,7 @@ class DriveService extends ChangeNotifier {
       case '.mobi':
       case '.azw':
       case '.azw3':
+      case '.prc':
         return 'application/x-mobipocket-ebook';
       default:
         // Try to infer from path content for web fake paths

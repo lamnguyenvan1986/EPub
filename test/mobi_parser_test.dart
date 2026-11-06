@@ -170,6 +170,32 @@ class TestHuff {
   }
 }
 
+/// Tạo file PalmDOC thuần (type TEXtREAd, record 0 chỉ có 16 byte, không MOBI header).
+Uint8List buildPalmDoc(List<List<int>> textRecords, {int compression = MobiParser.COMPRESSION_NONE, String name = 'palm doc'}) {
+  final r0 = ByteData(16)
+    ..setUint16(0, compression)
+    ..setUint32(4, textRecords.fold<int>(0, (n, r) => n + r.length))
+    ..setUint16(8, textRecords.length)
+    ..setUint16(10, 4096);
+  final records = [r0.buffer.asUint8List(), ...textRecords.map(Uint8List.fromList)];
+  final headerLength = 78 + records.length * 8 + 2;
+  final header = ByteData(headerLength);
+  final headerBytes = header.buffer.asUint8List()
+    ..setAll(0, ascii.encode(name))
+    ..setAll(60, ascii.encode('TEXtREAd'));
+  header.setUint16(76, records.length);
+  var offset = headerLength;
+  for (int i = 0; i < records.length; i++) {
+    header.setUint32(78 + i * 8, offset);
+    offset += records[i].length;
+  }
+  final out = BytesBuilder()..add(headerBytes);
+  for (final r in records) {
+    out.add(r);
+  }
+  return out.takeBytes();
+}
+
 void main() {
   const html = '<html><body><h1>Chương Một</h1><p>Xin chào &amp; tạm biệt.</p>'
       '<p>Đoạn thứ hai.</p><mbp:pagebreak/><h2>Chương Hai</h2><p>Nội dung<br/>xuống dòng</p>'
@@ -275,6 +301,45 @@ void main() {
       ]);
       final out = MobiParser.palmDocDecompress(input);
       expect(out, [...ascii.encode('abc'), 0xFF, 0xFE, ...ascii.encode(' d'), ...ascii.encode('abc')]);
+    });
+  });
+
+  group('PalmDOC thuần (.prc TEXtREAd)', () {
+    test('nhận file PalmDB theo type, không theo đuôi', () {
+      expect(MobiParser.isPalmBook(buildPalmDoc([ascii.encode('abc')])), isTrue);
+      expect(MobiParser.isPalmBook(buildMobi(textRecords: [ascii.encode('<p>a</p>')])), isTrue);
+      expect(MobiParser.isPalmBook(Uint8List.fromList(ascii.encode('%PDF-1.4' * 20))), isFalse);
+    });
+
+    test('chữ trơn UTF-8 tiếng Việt, tách chương theo tiêu đề, ghép dòng cứng', () {
+      const text = 'Truyện Kiều\r\n\r\nChương 1\r\n\r\nTrăm năm trong cõi người ta,\r\n'
+          'chữ tài chữ mệnh khéo là ghét nhau.\r\n\r\nCHƯƠNG 2\r\n\r\nTrải qua một cuộc bể dâu.\r\n';
+      final book = MobiParser.parse(buildPalmDoc([utf8.encode(text)], name: 'Truyen Kieu'));
+      expect(book.title, 'Truyen Kieu');
+      expect(book.chapters.map((c) => c.title), ['Mở đầu', 'Chương 1', 'CHƯƠNG 2']);
+      expect(book.chapters[1].paragraphs, contains('Trăm năm trong cõi người ta, chữ tài chữ mệnh khéo là ghét nhau.'));
+      expect(book.chapters[2].paragraphs, contains('Trải qua một cuộc bể dâu.'));
+    });
+
+    test('nén PalmDOC, không dòng trống: mỗi dòng một đoạn, chia phần', () {
+      final lines = [for (int i = 1; i <= 45; i++) 'Dong $i.'];
+      final raw = ascii.encode(lines.join('\n'));
+      // Nén PalmDOC "giả": mỗi byte literal 0x09..0x7F giữ nguyên
+      final book = MobiParser.parse(buildPalmDoc([raw], compression: MobiParser.COMPRESSION_PALMDOC));
+      expect(book.chapters.length, 2);
+      expect(book.chapters.first.title, 'Phần 1');
+      expect(book.chapters.first.blocks.length, MobiParser.plainParagraphsPerPart);
+      expect(book.chapters.last.blocks.last.text, 'Dong 45.');
+    });
+
+    test('PalmDOC chứa HTML vẫn đọc như HTML', () {
+      final book = MobiParser.parse(buildPalmDoc([latin1.encode('<p>Caf\u00e9 one</p><p>two</p>')]));
+      expect(book.chapters.single.blocks.map((b) => b.text), ['Café one', 'two']);
+    });
+
+    test('"Phần lớn..." không bị coi là tiêu đề', () {
+      final chapters = MobiParser.plainTextToChapters('Chương 1\nPhần lớn người đọc thích thơ.\nChương 2\nHết.');
+      expect(chapters.map((c) => c.title), ['Chương 1', 'Chương 2']);
     });
   });
 }

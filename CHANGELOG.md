@@ -2,6 +2,11 @@
 
 Các thay đổi quan trọng của LibriAudio. Chi tiết từng lỗi đã sửa xem [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md).
 
+## [1.6.0] - 2026-11-06
+### ✨ Thêm mới
+- Mở được file `.prc` (chọn từ máy, web/Safari iOS, Google Drive): PRC dạng MOBI đọc như MOBI; PRC/PalmDOC thuần (`TEXtREAd`, chữ trơn) tự nhận bảng mã UTF-8, ghép dòng cứng thành đoạn và tách chương theo dòng "Chương/Chapter/Phần..."
+- Nhận sách MOBI/PRC theo nội dung file (type PalmDB) khi đuôi file hoặc MIME không rõ
+
 ## [1.5.0] - 2026-11-06
 ### 🐛 Sửa lỗi
 - Android: đăng nhập Google dùng Client ID Web làm serverClientId, không còn phụ thuộc `google-services.json` mẫu

@@ -37,7 +37,7 @@ lib/
 │   │   ├── offline_tts_io.dart       # Tải, giải nén giọng; sherpa-onnx chạy trong isolate riêng
 │   │   ├── offline_tts_web.dart      # Gọi window.libriPiper (web/piper/) qua dart:js_interop
 │   │   └── audio_source*.dart        # Bytes -> AudioSource: file tạm (mobile), data URI (web)
-│   ├── mobi_parser.dart          # Đọc MOBI/AZW (PalmDB, nén PalmDOC và HUFF/CDIC), trích text và ảnh theo chương
+│   ├── mobi_parser.dart          # Đọc MOBI/AZW/PRC (PalmDB, nén PalmDOC và HUFF/CDIC), trích text và ảnh theo chương; PalmDOC thuần đọc như chữ trơn
 │   ├── epub_parser.dart          # Đọc EPUB 2/3 (zip, OPF, nav/NCX, XHTML) thành ReaderDocument; HtmlBlockExtractor
 │   ├── pdf_text_extractor.dart   # Trích chữ PDF theo trang, ghép dòng thành đoạn (xem dạng chữ, TTS)
 │   ├── reader_tts_segments.dart  # Hàng đợi TTS từ ReaderDocument, mỗi đoạn trỏ về khối để tô sáng
