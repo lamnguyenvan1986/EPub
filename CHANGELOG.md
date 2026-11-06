@@ -3,17 +3,18 @@
 Các thay đổi quan trọng của LibriAudio. Chi tiết từng lỗi đã sửa xem [docs/BUGFIX_LOG.md](docs/BUGFIX_LOG.md).
 
 ## [1.5.0] - 2026-11-06
+### 🐛 Sửa lỗi
+- Android: đăng nhập Google dùng Client ID Web làm serverClientId, không còn phụ thuộc `google-services.json` mẫu
+- EPUB: hiện ảnh bìa dạng SVG, bỏ trang mục lục thừa và số chú thích dính vào câu
+- Thư viện hiện tên sách và tác giả từ metadata thay cho tên file
+- MOBI không còn cắt đoạn giữa câu; PDF dạng chữ tách đúng câu thơ và tiêu đề
+
 ### ✨ Thêm mới
 - Trình đọc chung cho EPUB, MOBI/AZW và PDF dạng chữ: cùng tùy chọn hiển thị (nút Tt) gồm cuộn hoặc lật trang, phông có chân/không chân, cỡ chữ, giãn dòng, lề, căn đều, nền trắng/giấy cũ/tối/theo app; tùy chọn được lưu lại
 - EPUB đọc bằng parser riêng (không dùng katbook_epub_reader): có ảnh, tiêu đề, tên chương từ mục lục, vẫn mở được các file lỗi trước đây cần tự sửa; EPUB có DRM báo rõ
 - PDF: nút "Xem dạng chữ" ghép dòng thành đoạn và hiển thị bằng trình đọc chung
 - Nghe ngay trong màn đọc: thanh điều khiển ở dưới, đoạn đang đọc được tô sáng và trang tự cuộn/lật theo; PDF xem nguyên trang thì tự lật tới trang đang đọc
 - Mục lục để nhảy chương
-
-### 🐛 Bug fixes
-- EPUB: hiện ảnh bìa dạng SVG, bỏ trang mục lục thừa và số chú thích dính vào câu
-- Thư viện hiện tên sách và tác giả từ metadata thay cho tên file
-- MOBI không còn cắt đoạn giữa câu; PDF dạng chữ tách đúng câu thơ và tiêu đề
 
 ## [1.4.0] - 2026-10-31
 ### ✨ Thêm mới

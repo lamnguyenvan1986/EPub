@@ -27,6 +27,15 @@ class DriveService extends ChangeNotifier {
   /// google_sign_in_web đọc thẻ meta `google-signin-client_id` trong web/index.html.
   static const String webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
 
+  /// Client ID Web của Lam (cùng project Google Cloud với client Android).
+  /// Android dùng nó làm serverClientId; client Android chỉ cần khai báo đúng
+  /// package name + SHA-1 trong cùng project, không cần ghi ID vào code.
+  static const String _defaultWebClientId =
+      '577711935566-jaseuqiriheu4vu4980ojlm9o4a3lv8l.apps.googleusercontent.com';
+
+  static String get _serverClientId =>
+      webClientId.isNotEmpty ? webClientId : _defaultWebClientId;
+
   drive.DriveApi? _driveApi;
   GoogleSignInAccount? _account;
   DateTime? _tokenExpiry;
@@ -45,6 +54,9 @@ class DriveService extends ChangeNotifier {
   Future<void> _ensureInitialized() {
     return _initFuture ??= _googleSignIn.initialize(
       clientId: kIsWeb && webClientId.isNotEmpty ? webClientId : null,
+      // Android (Credential Manager) bắt buộc có serverClientId; không truyền
+      // thì plugin lấy từ google-services.json, mà file đó đang là mẫu.
+      serverClientId: kIsWeb ? null : _serverClientId,
     );
   }
 

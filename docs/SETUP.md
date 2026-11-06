@@ -84,13 +84,12 @@ Nếu không đặt biến này, app dùng Client ID trong thẻ `<meta name="go
 
 ### Android/iOS
 
-`android/app/google-services.json` và `ios/Runner/GoogleService-Info.plist` hiện là giá trị mẫu, nên chưa đăng nhập được. Để bật:
+Android không cần `google-services.json` thật: code truyền Client ID Web (`577711935566-jaseuqiriheu4vu4980ojlm9o4a3lv8l`, hoặc giá trị `--dart-define=GOOGLE_WEB_CLIENT_ID`) làm `serverClientId`. Chỉ cần trong **cùng project** Google Cloud với client Web đó:
 
-1. Trên Google Cloud Console, tạo project và bật **Google Drive API**.
-2. Tạo OAuth client **Android** với package name của app và SHA-1 của keystore (`cd android && ./gradlew signingReport`).
-3. Tạo OAuth client **Web** (dùng làm server client ID cho `google_sign_in`).
-4. Tải `google-services.json` mới thay file mẫu; với iOS thì thêm `GoogleService-Info.plist` và URL scheme tương ứng.
-5. Thêm tài khoản thử vào *OAuth consent screen > Test users* khi app còn ở chế độ Testing.
+1. Bật **Google Drive API** và thêm tài khoản thử vào *OAuth consent screen > Test users* (giống bản web).
+2. Tạo OAuth client loại **Android**: package name `com.example.libri_audio`, SHA-1 của keystore ký APK. APK hiện ký bằng debug keystore của máy build, lấy SHA-1 bằng `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android` (hoặc `cd android && ./gradlew signingReport`). Build APK trên máy khác thì phải thêm SHA-1 của máy đó.
+
+iOS chưa build được vì repo chưa có `ios/Runner.xcodeproj`; khi có, cần tạo client loại **iOS** (bundle ID `com.example.libriAudio`) rồi điền `GIDClientID` và URL scheme đảo ngược vào `ios/Runner/Info.plist`.
 
 ## Xử lý sự cố
 
