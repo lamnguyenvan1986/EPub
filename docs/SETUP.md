@@ -36,7 +36,8 @@ flutter analyze
 | `test/tts_split_test.dart` | `TtsService.splitText` chia đoạn văn cho TTS |
 | `test/mobi_parser_test.dart` | Đọc file MOBI/AZW, giải nén PalmDOC và HUFF/CDIC, ảnh, DRM |
 | `test/drive_mime_test.dart` | Nhận loại sách từ MIME và đuôi file trên Drive |
-| `test/epub_repair_test.dart` | Sửa EPUB lỗi mục lục và manifest |
+| `test/epub_parser_test.dart` | Đọc EPUB thành chương/khối, tên chương từ nav/NCX, file lỗi (nav nhiều thuộc tính, thiếu file, sai hoa/thường), DRM |
+| `test/reader_content_test.dart` | PDF dạng chữ (ghép dòng), hàng đợi TTS, MOBI sang mô hình chung, tùy chọn hiển thị, chia trang, trình đọc chung (cuộn, lật trang, tô sáng) |
 | `test/neural_tts_test.dart` | Azure/Google TTS (HTTP giả lập), danh sách giọng offline; tạo WAV bằng sherpa-onnx nếu có model |
 
 Test sherpa-onnx cần file model và thư viện native, nên mặc định bị bỏ qua. Để chạy trên Linux:
@@ -97,7 +98,7 @@ Nếu không đặt biến này, app dùng Client ID trong thẻ `<meta name="go
 |------------|------------|
 | `decodeLazy isn't defined` khi build | Kiểm tra `dependency_overrides: image: 4.10.2` còn trong `pubspec.yaml` |
 | Web đọc bằng giọng tiếng Anh | Trình duyệt chưa có giọng `vi-VN`; chọn giọng trong Cài đặt hoặc cài giọng tiếng Việt cho hệ điều hành |
-| "Không thể đọc file EPUB" kèm lý do | App đã thử tự sửa; nếu vẫn lỗi, ghi lại lý do và file để thêm vào `epub_repair.dart` |
+| EPUB báo "thiếu mục lục nội dung" hoặc "không tìm thấy nội dung" | Ghi lại file để bổ sung cách đọc vào `epub_parser.dart` |
 | Web: giọng offline báo "Không chạy được giọng offline" | Thiếu `web/piper/vendor/`: chạy `./tool/fetch_piper_web.sh` rồi build lại |
 | Web: bấm Connect Google Drive không có gì | Trình duyệt chặn popup, hoặc Client ID chưa có origin của trang trong *Authorized JavaScript origins* |
 | MOBI không mở được | File có DRM (không hỗ trợ, app báo lỗi rõ ràng) |

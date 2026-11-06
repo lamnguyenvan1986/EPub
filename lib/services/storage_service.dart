@@ -130,6 +130,10 @@ class StorageService {
   String get lastDir => _prefs.getString('last_dir') ?? '';
   Future<void> saveLastDir(String path) => _prefs.setString('last_dir', path);
 
+  /// Tùy chọn hiển thị của trình đọc (JSON của ReaderSettings).
+  String? get readerSettings => _prefs.getString('reader_settings');
+  Future<void> saveReaderSettings(String json) => _prefs.setString('reader_settings', json);
+
   double get pitch => _prefs.getDouble('pitch') ?? 1.0;
   Future<void> savePitch(double pitch) => _prefs.setDouble('pitch', pitch);
 

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:html/parser.dart' as html_parser;
+import 'package:libri_audio/models/reader_content.dart';
 
 /// Một khối nội dung trong chương: đoạn văn hoặc ảnh (khoá trong [MobiBook.images]).
 class MobiBlock {
@@ -39,6 +40,23 @@ class MobiBook {
     required this.chapters,
     this.images = const {},
   });
+
+  /// Chuyển sang mô hình nội dung chung để hiển thị bằng trình đọc chung.
+  /// Ảnh không có trong file (recindex sai) bị bỏ qua.
+  ReaderDocument toReaderDocument() => ReaderDocument(
+        title: title,
+        author: author,
+        chapters: [
+          for (final c in chapters)
+            ReaderChapter(c.title, [
+              for (final b in c.blocks)
+                if (!b.isImage)
+                  ReaderBlock.paragraph(b.text!)
+                else if (images[b.imageIndex] != null)
+                  ReaderBlock.image(images[b.imageIndex]!),
+            ]),
+        ],
+      );
 }
 
 class MobiFormatException implements Exception {

@@ -1,0 +1,6 @@
+Liberation Serif (LiberationSerif-Regular.ttf)
+Digitized data copyright (c) 2010 Google Corporation with Reserved Font Arimo, Tinos and Cousine.
+Copyright (c) 2012 Red Hat, Inc. with Reserved Font Name Liberation.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1
+(full text in OFL.txt in this folder, also at https://openfontlicense.org).
