@@ -113,6 +113,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
         throw Exception('Định dạng file không được hỗ trợ: ${_book.fileType}');
       }
       _clampPosition();
+      _updateBookInfo();
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -128,6 +129,21 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
             : 'Lỗi khi đọc file: ${e.toString()}';
       });
     }
+  }
+
+  /// Sách nhập từ file mang tên file và tác giả "Unknown": thay bằng tên sách
+  /// và tác giả trong metadata của EPUB/MOBI.
+  void _updateBookInfo() {
+    final doc = _document;
+    if (doc == null || _isPdf) return;
+    final looksLikeFileName = RegExp(r'\.(epub|mobi|azw3?|prc)$', caseSensitive: false).hasMatch(_book.title);
+    final title = doc.title.trim();
+    final author = doc.author?.trim();
+    final newTitle = looksLikeFileName && title.isNotEmpty && title != 'Không có tiêu đề' ? title : null;
+    final newAuthor = (_book.author == null || _book.author == 'Unknown') && author != null && author.isNotEmpty ? author : null;
+    if (newTitle == null && newAuthor == null) return;
+    _book = _book.copyWith(title: newTitle, author: newAuthor);
+    context.read<BookProvider>().updateBook(_book);
   }
 
   /// Vị trí đã lưu có thể vượt quá nội dung (sách đổi, hoặc bản cũ lưu theo cách khác).

@@ -60,7 +60,9 @@ class PdfTextExtractor {
         continue;
       }
       if (previous.isNotEmpty) {
-        final endsParagraph = _sentenceEnd.hasMatch(previous) && previous.length < maxLength * 0.8;
+        // Dòng ngắn hẳn (câu thơ, tiêu đề, tên tác giả) hoặc dòng cuối câu hơi ngắn là hết đoạn
+        final endsParagraph = previous.length < maxLength * 0.6 ||
+            (_sentenceEnd.hasMatch(previous) && previous.length < maxLength * 0.8);
         if (endsParagraph || _listStart.hasMatch(line)) {
           flush();
         }

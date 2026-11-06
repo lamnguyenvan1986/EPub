@@ -43,12 +43,13 @@ void main() {
     });
 
     test('dòng trống, mục danh sách và gạch nối cuối dòng', () {
-      const page = 'Tiêu đề\n\nMở đầu danh sách như sau đây là các mục\n- mục một\n- mục hai\nThis is an infor-\nmation line.';
+      const page = 'Tiêu đề\n\nMở đầu danh sách như sau đây là các mục\n- mục một\n- mục hai\nThis is a much longer line with some infor-\nmation.';
       expect(PdfTextExtractor.reflowParagraphs(page), [
         'Tiêu đề',
         'Mở đầu danh sách như sau đây là các mục',
         '- mục một',
-        '- mục hai This is an information line.',
+        '- mục hai',
+        'This is a much longer line with some information.',
       ]);
     });
   });
@@ -72,6 +73,29 @@ void main() {
     expect((segments.last.chapter, segments.last.startBlock), (1, 0));
     expect(segmentIndexFor(segments, 0, 2), 2); // ảnh: đọc từ khối chữ kế tiếp
     expect(segmentIndexFor(segments, 1, 0), segments.length - 1);
+  });
+
+  test('PDF: câu thơ và dòng tên tác giả ngắn không bị dồn vào một đoạn', () {
+    const page = 'Truyện Kiều\nNguyễn Du\nTrăm năm trong cõi người ta,\nChữ tài chữ mệnh khéo là ghét nhau.\n'
+        'Đầu đời Gia Tĩnh triều Minh, bốn phương phẳng lặng, hai kinh vững vàng. Có nhà viên ngoại\n'
+        'họ Vương, gia tư nghĩ cũng thường thường bậc trung, một trai con thứ rốt lòng, Vương Quan\n'
+        'là chữ, nối dòng nho gia.';
+    expect(PdfTextExtractor.reflowParagraphs(page), [
+      'Truyện Kiều',
+      'Nguyễn Du',
+      'Trăm năm trong cõi người ta,',
+      'Chữ tài chữ mệnh khéo là ghét nhau.',
+      'Đầu đời Gia Tĩnh triều Minh, bốn phương phẳng lặng, hai kinh vững vàng. Có nhà viên ngoại '
+          'họ Vương, gia tư nghĩ cũng thường thường bậc trung, một trai con thứ rốt lòng, Vương Quan '
+          'là chữ, nối dòng nho gia.',
+    ]);
+  });
+
+  test('MOBI: xuống dòng trong mã HTML không cắt đoạn; tên chương đầu chương thành tiêu đề', () {
+    final chapters = MobiParser.htmlToChapters('<h2>Hồi 1</h2><p>Câu dài bị\nxuống dòng\r\ntrong file.</p><p>Thơ<br/>dòng hai</p>');
+    expect(chapters.single.paragraphs, ['Hồi 1', 'Câu dài bị xuống dòng trong file.', 'Thơ', 'dòng hai']);
+    final doc = MobiBook(title: 'M', chapters: chapters).toReaderDocument();
+    expect(doc.chapters.single.blocks.first.type, ReaderBlockType.heading);
   });
 
   test('MOBI chuyển sang mô hình chung, bỏ ảnh không có trong file', () {

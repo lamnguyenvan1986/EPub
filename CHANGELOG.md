@@ -5,6 +5,9 @@ Các thay đổi quan trọng của LibriAudio. Chi tiết từng lỗi đã s�
 ## [1.5.0] - 2026-11-06
 ### 🐛 Sửa lỗi
 - Android: đăng nhập Google dùng Client ID Web làm serverClientId, không còn phụ thuộc `google-services.json` mẫu
+- EPUB: hiện ảnh bìa dạng SVG, bỏ trang mục lục thừa và số chú thích dính vào câu
+- Thư viện hiện tên sách và tác giả từ metadata thay cho tên file
+- MOBI không còn cắt đoạn giữa câu; PDF dạng chữ tách đúng câu thơ và tiêu đề
 
 ### ✨ Thêm mới
 - Trình đọc chung cho EPUB, MOBI/AZW và PDF dạng chữ: cùng tùy chọn hiển thị (nút Tt) gồm cuộn hoặc lật trang, phông có chân/không chân, cỡ chữ, giãn dòng, lề, căn đều, nền trắng/giấy cũ/tối/theo app; tùy chọn được lưu lại
