@@ -10,6 +10,11 @@ Các thay đổi quan trọng của LibriAudio. Chi tiết từng lỗi đã s�
 - Nghe ngay trong màn đọc: thanh điều khiển ở dưới, đoạn đang đọc được tô sáng và trang tự cuộn/lật theo; PDF xem nguyên trang thì tự lật tới trang đang đọc
 - Mục lục để nhảy chương
 
+### 🐛 Bug fixes
+- EPUB: hiện ảnh bìa dạng SVG, bỏ trang mục lục thừa và số chú thích dính vào câu
+- Thư viện hiện tên sách và tác giả từ metadata thay cho tên file
+- MOBI không còn cắt đoạn giữa câu; PDF dạng chữ tách đúng câu thơ và tiêu đề
+
 ## [1.4.0] - 2026-10-31
 ### ✨ Thêm mới
 - Web: giọng offline Piper VAIS1000 chạy ngay trong trình duyệt (onnxruntime-web trong Web Worker), tải 64 MB một lần

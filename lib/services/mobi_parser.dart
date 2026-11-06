@@ -42,18 +42,21 @@ class MobiBook {
   });
 
   /// Chuyển sang mô hình nội dung chung để hiển thị bằng trình đọc chung.
-  /// Ảnh không có trong file (recindex sai) bị bỏ qua.
+  /// Ảnh không có trong file (recindex sai) bị bỏ qua. Đoạn đầu chương trùng tên
+  /// chương được hiện như tiêu đề.
   ReaderDocument toReaderDocument() => ReaderDocument(
         title: title,
         author: author,
         chapters: [
           for (final c in chapters)
             ReaderChapter(c.title, [
-              for (final b in c.blocks)
-                if (!b.isImage)
-                  ReaderBlock.paragraph(b.text!)
-                else if (images[b.imageIndex] != null)
-                  ReaderBlock.image(images[b.imageIndex]!),
+              for (int i = 0; i < c.blocks.length; i++)
+                if (!c.blocks[i].isImage)
+                  i == 0 && c.blocks[i].text == c.title
+                      ? ReaderBlock.heading(c.title, level: 1)
+                      : ReaderBlock.paragraph(c.blocks[i].text!)
+                else if (images[c.blocks[i].imageIndex] != null)
+                  ReaderBlock.image(images[c.blocks[i].imageIndex]!),
             ]),
         ],
       );
@@ -331,8 +334,11 @@ class MobiParser {
   static List<MobiChapter> htmlToChapters(String html) {
     final chapters = <MobiChapter>[];
     for (final part in html.split(_pageBreak)) {
+      // Xuống dòng trong mã HTML chỉ là khoảng trắng, không phải ngắt đoạn
+      // (nếu không, đoạn văn bị cắt giữa câu ở mỗi chỗ xuống dòng của file gốc)
+      final collapsed = part.replaceAll(RegExp(r'\s+'), ' ');
       // Ảnh thành một dòng riêng chứa dấu đánh dấu, để giữ đúng thứ tự với chữ
-      final marked = part.replaceAllMapped(_imgTag, (m) {
+      final marked = collapsed.replaceAllMapped(_imgTag, (m) {
         final index = imageIndexOf(m.group(0)!);
         return index == null || index <= 0 ? '' : '\n$index\n';
       });

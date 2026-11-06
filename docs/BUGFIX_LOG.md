@@ -137,3 +137,16 @@ Kiểm tra: 34 EPUB mẫu của epubx: trước 31/34 mở được, sau 33/34 (
 | 50 | `lib/services/mobi_parser.dart` | File có DRM chỉ báo "có DRM, không thể đọc" | Thông báo nói rõ là khoá bản quyền Amazon/Kindle và cần file không DRM. Không giải mã DRM |
 
 Kiểm tra: test mới dựng file HUFF/CDIC (mã 8 bit và 9 bit, cụm nén đệ quy) và file có ảnh; dữ liệu HUFF cũng được giải bằng bản Python theo Calibre cho cùng kết quả. `test/mobi_parser_test.dart` pass trên Dart VM và trên Chromium (`flutter test --platform chrome`). `flutter test` → 43 pass (1 skip cần model Piper). Chưa thử với file MOBI thật.
+
+### Đợt 8 (2026-11-06): chạy thử trình đọc chung với sách mẫu
+
+| # | File | Lỗi | Cách sửa |
+|---|------|-----|----------|
+| 51 | `lib/services/epub_parser.dart` | Ảnh bìa EPUB dạng `<svg><image xlink:href>` không hiện | Parser HTML5 lưu `xlink:href` với khoá có namespace; tìm thuộc tính theo tên cục bộ (`_href`) |
+| 52 | `lib/services/epub_parser.dart` | Trang mục lục (nav) trong spine hiện như một chương | Bỏ mục `properties="nav"` khỏi danh sách chương; app có mục lục riêng |
+| 53 | `lib/services/epub_parser.dart` | Số chú thích (`epub:type="noteref"`) dính vào cuối câu và bị TTS đọc | Bỏ thẻ noteref khi tách khối; phần chú thích cuối chương vẫn giữ |
+| 54 | `lib/screens/book_reader_screen.dart` | Thư viện hiện tên file và tác giả "Unknown" | Khi mở EPUB/MOBI, thay bằng tên sách và tác giả trong metadata (`_updateBookInfo`) |
+| 55 | `lib/services/mobi_parser.dart` | MOBI cắt đoạn giữa câu ở mỗi chỗ xuống dòng trong HTML gốc | Gom khoảng trắng (cả xuống dòng) trước khi tách đoạn; chỉ thẻ khối và `<br>` mới ngắt đoạn. Tên chương ở đầu chương hiện như tiêu đề |
+| 56 | `lib/services/pdf_text_extractor.dart` | PDF dạng chữ dồn câu thơ, tên tác giả, tiêu đề vào một đoạn | Dòng ngắn hơn 60% dòng dài nhất trang cũng kết thúc đoạn |
+
+Kiểm tra: sách mẫu Truyện Kiều tạo bằng pandoc (EPUB có bìa SVG, nav trong spine, chú thích, thơ, ảnh), MOBI dựng từ cùng HTML, PDF xuất bằng LibreOffice; chạy bản web release bằng Chromium. `flutter test` → 63 pass. Sách thật từ Gutenberg không tải được do mạng chặn.
