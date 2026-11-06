@@ -7,6 +7,7 @@ import 'package:libri_audio/providers/book_provider.dart';
 import 'package:libri_audio/providers/highlight_provider.dart';
 import 'package:libri_audio/providers/playlist_provider.dart';
 import 'package:libri_audio/providers/theme_provider.dart';
+import 'package:libri_audio/providers/reader_settings_provider.dart';
 import 'package:libri_audio/services/storage_service.dart';
 import 'package:libri_audio/services/drive_service.dart';
 import 'package:libri_audio/services/tts_audio_handler.dart';
@@ -100,6 +101,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => BookProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => ReaderSettingsProvider(storage: StorageService())),
         ChangeNotifierProvider.value(value: ttsService),
         ChangeNotifierProvider(create: (_) => PlaylistProvider()),
         ChangeNotifierProvider(create: (_) => HighlightProvider()),
