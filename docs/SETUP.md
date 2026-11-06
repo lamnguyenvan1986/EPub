@@ -34,7 +34,7 @@ flutter analyze
 |------|----------|
 | `test/models_test.dart` | Model Book, Highlight, Playlist (tạo, toMap/fromMap, copyWith) |
 | `test/tts_split_test.dart` | `TtsService.splitText` chia đoạn văn cho TTS |
-| `test/mobi_parser_test.dart` | Đọc file MOBI/AZW, giải nén PalmDOC và HUFF/CDIC, ảnh, DRM |
+| `test/mobi_parser_test.dart` | Đọc file MOBI/AZW/PRC, PalmDOC thuần (chữ trơn), giải nén PalmDOC và HUFF/CDIC, ảnh, DRM |
 | `test/drive_mime_test.dart` | Nhận loại sách từ MIME và đuôi file trên Drive |
 | `test/epub_parser_test.dart` | Đọc EPUB thành chương/khối, tên chương từ nav/NCX, file lỗi (nav nhiều thuộc tính, thiếu file, sai hoa/thường), DRM |
 | `test/reader_content_test.dart` | PDF dạng chữ (ghép dòng), hàng đợi TTS, MOBI sang mô hình chung, tùy chọn hiển thị, chia trang, trình đọc chung (cuộn, lật trang, tô sáng) |

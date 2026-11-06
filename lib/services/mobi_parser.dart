@@ -70,7 +70,10 @@ class MobiFormatException implements Exception {
   String toString() => message;
 }
 
-/// Đọc file MOBI/AZW (định dạng PalmDB) và trích text theo chương.
+/// Đọc file MOBI/AZW/PRC (định dạng PalmDB) và trích text theo chương.
+///
+/// File PalmDOC thuần (type `TEXtREAd`, không có MOBI header) được đọc như
+/// chữ trơn.
 ///
 /// Hỗ trợ nén PalmDOC, HUFF/CDIC và không nén; lấy ảnh JPEG/PNG/GIF/BMP.
 /// File có DRM không đọc được (báo lỗi rõ ràng).
@@ -186,8 +189,15 @@ class MobiParser {
       }
     }
 
-    final html = _decode(text.takeBytes(), encoding);
-    final parsed = htmlToChapters(html);
+    final List<MobiChapter> parsed;
+    if (hasMobiHeader) {
+      parsed = htmlToChapters(_decode(text.takeBytes(), encoding));
+    } else {
+      // PalmDOC thuần (thường là file .prc/.pdb cũ): không có MOBI header nên
+      // không biết bảng mã; nội dung thường là chữ trơn, đôi khi là HTML.
+      final content = decodePlain(text.takeBytes());
+      parsed = looksLikeHtml(content) ? htmlToChapters(content) : plainTextToChapters(content);
+    }
 
     // Lấy ảnh được nhắc tới trong nội dung; bỏ khối ảnh không đọc được
     final images = <int, Uint8List>{};
@@ -212,6 +222,82 @@ class MobiParser {
     }
 
     return MobiBook(title: title.trim(), author: author?.trim(), chapters: chapters, images: images);
+  }
+
+  /// Nhận ra file PalmDB chứa sách (MOBI/AZW/PRC hoặc PalmDOC thuần) theo
+  /// type/creator ở byte 60..67, không cần dựa vào đuôi file.
+  static bool isPalmBook(Uint8List bytes) {
+    if (bytes.length < 78) return false;
+    final type = latin1.decode(bytes.sublist(60, 68), allowInvalid: true);
+    return type == 'BOOKMOBI' || type == 'TEXtREAd';
+  }
+
+  /// Giải mã chữ của PalmDOC thuần: thử UTF-8 trước (sách tiếng Việt tự tạo
+  /// thường là UTF-8), không được thì coi là Latin-1/CP1252.
+  static String decodePlain(Uint8List bytes) {
+    try {
+      return utf8.decode(bytes);
+    } on FormatException {
+      return latin1.decode(bytes, allowInvalid: true);
+    }
+  }
+
+  static final RegExp _htmlMarker = RegExp(r'<(html|body|p|br|div|h[1-6])\b[^>]*>', caseSensitive: false);
+
+  static bool looksLikeHtml(String text) => _htmlMarker.hasMatch(text);
+
+  /// Dòng tiêu đề chương trong chữ trơn, ví dụ "Chương 3", "CHAPTER IV", "Hồi thứ nhất".
+  static final RegExp _plainHeading = RegExp(
+    r'^(chương|chuong|hồi|phần|quyển|chapter|part|book)\s+(\d+|[ivxlcdm]+(?=$|[\s.:\-–—])|thứ\s)[^\n]{0,60}$',
+    caseSensitive: false,
+    unicode: true,
+  );
+
+  /// Số đoạn mỗi phần khi chữ trơn không có tiêu đề chương.
+  static const int plainParagraphsPerPart = 40;
+
+  /// Tách chữ trơn thành chương. Nếu file có dòng trống giữa các đoạn thì
+  /// xuống dòng đơn chỉ là ngắt dòng cứng (ghép lại), nếu không mỗi dòng là
+  /// một đoạn. Chương bắt đầu ở dòng tiêu đề; không có tiêu đề thì chia phần.
+  static List<MobiChapter> plainTextToChapters(String text) {
+    final normalized = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n').replaceAll('\u0000', '');
+    final blankLines = RegExp(r'\n[ \t]*\n');
+    final rawParagraphs = blankLines.allMatches(normalized).length >= 2
+        ? normalized.split(blankLines)
+        : normalized.split('\n');
+    final paragraphs = <String>[
+      for (final raw in rawParagraphs)
+        if (raw.trim().isNotEmpty) raw.replaceAll(RegExp(r'\s+'), ' ').trim(),
+    ];
+
+    final chapters = <MobiChapter>[];
+    var title = '';
+    var blocks = <MobiBlock>[];
+    final hasHeadings = paragraphs.any(_plainHeading.hasMatch);
+
+    void flush() {
+      if (blocks.isEmpty) return;
+      final name = title.isNotEmpty
+          ? title
+          : hasHeadings
+              ? 'Mở đầu'
+              : 'Phần ${chapters.length + 1}';
+      chapters.add(MobiChapter(name, blocks));
+      blocks = <MobiBlock>[];
+      title = '';
+    }
+
+    for (final paragraph in paragraphs) {
+      if (hasHeadings && _plainHeading.hasMatch(paragraph)) {
+        flush();
+        title = paragraph;
+      } else if (!hasHeadings && blocks.length >= plainParagraphsPerPart) {
+        flush();
+      }
+      blocks.add(MobiBlock.text(paragraph));
+    }
+    flush();
+    return chapters;
   }
 
   /// Ảnh JPEG, PNG, GIF hoặc BMP (các định dạng Flutter hiển thị được).

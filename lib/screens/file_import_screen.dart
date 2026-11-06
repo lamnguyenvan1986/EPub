@@ -167,7 +167,7 @@ class _FileImportScreenState extends State<FileImportScreen> {
     }
   }
 
-  static const List<String> _supportedExtensions = ['pdf', 'epub', 'mobi', 'azw', 'azw3'];
+  static const List<String> _supportedExtensions = ['pdf', 'epub', 'mobi', 'azw', 'azw3', 'prc'];
 
   Future<void> _handleImportFromDevice() async {
     // Import from device using file picker
@@ -194,7 +194,7 @@ class _FileImportScreenState extends State<FileImportScreen> {
       if (!result.name.contains('.') || !_supportedExtensions.contains(extension)) {
         if (mounted) {
           setState(() {
-            _error = 'Unsupported file: ${result.name}. Choose a PDF, EPUB, MOBI or AZW file.';
+            _error = 'Unsupported file: ${result.name}. Choose a PDF, EPUB, MOBI, AZW or PRC file.';
           });
         }
         return;

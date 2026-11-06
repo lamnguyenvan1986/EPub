@@ -1,12 +1,12 @@
 # LibriAudio
 
-Ứng dụng Flutter để đọc sách điện tử (EPUB, PDF, MOBI/AZW) và nghe sách bằng giọng đọc máy (text-to-speech), mặc định giọng tiếng Việt.
+Ứng dụng Flutter để đọc sách điện tử (EPUB, PDF, MOBI/AZW/PRC) và nghe sách bằng giọng đọc máy (text-to-speech), mặc định giọng tiếng Việt.
 
 **Bản web:** https://lamnguyenvan1986.github.io/EPub/ (tự build và cập nhật mỗi khi có commit lên `main`).
 
 ## Tính năng
 
-- Đọc EPUB, MOBI/AZW (không DRM, có ảnh, nén PalmDOC hoặc HUFF/CDIC) và PDF bằng một trình đọc chung: cuộn hoặc lật trang, chọn phông, cỡ chữ, giãn dòng, lề, nền trắng/giấy cũ/tối. PDF xem nguyên trang hoặc dạng chữ.
+- Đọc EPUB, MOBI/AZW/PRC (không DRM, có ảnh, nén PalmDOC hoặc HUFF/CDIC) và PDF bằng một trình đọc chung: cuộn hoặc lật trang, chọn phông, cỡ chữ, giãn dòng, lề, nền trắng/giấy cũ/tối. PDF xem nguyên trang hoặc dạng chữ.
 - Nghe sách ngay trong màn đọc: đoạn đang đọc được tô sáng và tự cuộn/lật theo; chọn giọng, chỉnh tốc độ và cao độ, đọc tiếp từ vị trí đã dừng, tự chuyển chương.
 - Phát nền trên Android/iOS: thông báo điều khiển, nút tai nghe, màn hình khoá.
 - Nhập sách từ máy hoặc từ Google Drive.

@@ -103,7 +103,8 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       if (_book.fileType.contains('epub')) {
         // Giải nén và tách HTML ở isolate khác để không đứng giao diện
         _document = await compute(EpubParser.parse, bytes);
-      } else if (_isMobi) {
+      } else if (_isMobi || MobiParser.isPalmBook(bytes)) {
+        // Nhận theo nội dung file PalmDB khi đuôi/MIME không rõ (vd. .prc lưu là octet-stream)
         final mobi = await compute(MobiParser.parse, bytes);
         _document = mobi.toReaderDocument();
       } else if (_isPdf) {
