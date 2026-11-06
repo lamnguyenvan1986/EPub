@@ -137,3 +137,11 @@ Kiểm tra: 34 EPUB mẫu của epubx: trước 31/34 mở được, sau 33/34 (
 | 50 | `lib/services/mobi_parser.dart` | File có DRM chỉ báo "có DRM, không thể đọc" | Thông báo nói rõ là khoá bản quyền Amazon/Kindle và cần file không DRM. Không giải mã DRM |
 
 Kiểm tra: test mới dựng file HUFF/CDIC (mã 8 bit và 9 bit, cụm nén đệ quy) và file có ảnh; dữ liệu HUFF cũng được giải bằng bản Python theo Calibre cho cùng kết quả. `test/mobi_parser_test.dart` pass trên Dart VM và trên Chromium (`flutter test --platform chrome`). `flutter test` → 43 pass (1 skip cần model Piper). Chưa thử với file MOBI thật.
+
+## 2026-11-06: Đăng nhập Google trên Android
+
+| # | File | Lỗi | Cách sửa |
+|---|------|-----|----------|
+| 51 | `lib/services/drive_service.dart` | Android không đăng nhập Google được: `google_sign_in` 7 cần `serverClientId`, code không truyền nên plugin lấy từ `google-services.json` mẫu (`YOUR_WEB_CLIENT_ID`) | Truyền Client ID Web của Lam làm `serverClientId` trên Android/iOS (ưu tiên `--dart-define=GOOGLE_WEB_CLIENT_ID`). Chỉ còn cần tạo client Android (package + SHA-1) trong cùng project |
+
+Kiểm tra: `flutter analyze` sạch (4 info cũ), `flutter test` 60 pass. Chưa thử trên máy Android thật vì chưa có client Android.
