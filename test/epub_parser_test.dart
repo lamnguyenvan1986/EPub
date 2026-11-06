@@ -149,4 +149,19 @@ void main() {
     expect(imageSizeOf(_png), (width: 1, height: 1));
     expect(imageSizeOf(Uint8List.fromList([0, 1, 2])), isNull);
   });
+
+  test('ảnh bìa trong <svg><image xlink:href>, bỏ trang nav khỏi spine, bỏ số chú thích', () {
+    final doc = EpubParser.parse(_epub(
+      manifestExtra: '<item id="cover" href="Text/cover.xhtml" media-type="application/xhtml+xml"/>',
+      spineExtra: '<itemref idref="nav"/><itemref idref="cover"/>',
+      c1Body: '<p>Câu có chú thích.<a href="#fn1" epub:type="noteref">1</a></p>',
+      files: {
+        'OEBPS/Text/cover.xhtml':
+            '<html xmlns="http://www.w3.org/1999/xhtml"><body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><image width="1" height="1" xlink:href="../Images/a%20b.png"/></svg></body></html>',
+      },
+    ));
+    expect(doc.chapters, hasLength(2)); // c1 và bìa, không có trang nav
+    expect(doc.chapters.first.blocks.first.text, 'Câu có chú thích.');
+    expect(doc.chapters.last.blocks.single.image, _png);
+  });
 }

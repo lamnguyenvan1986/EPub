@@ -63,7 +63,8 @@ class EpubParser {
     final spine = <_Item>[];
     for (final m in RegExp(r'<(?:\w+:)?itemref\b[^>]*>').allMatches(opf)) {
       final item = manifest[_attr(m.group(0)!, 'idref')];
-      if (item != null && item.mediaType.contains('html')) spine.add(item);
+      // Bỏ trang mục lục (nav) trong spine: app có mục lục riêng
+      if (item != null && item.mediaType.contains('html') && !item.properties.contains('nav')) spine.add(item);
     }
     if (spine.isEmpty) {
       // Spine trống: đọc mọi file HTML theo thứ tự manifest
@@ -320,6 +321,17 @@ class HtmlBlockExtractor {
     }
   }
 
+  /// `href`/`xlink:href` của `<image>` trong SVG. Parser HTML5 lưu `xlink:href`
+  /// với khoá có namespace (không phải chuỗi), nên tìm theo tên cục bộ.
+  static String? _href(dom.Element element) {
+    for (final entry in element.attributes.entries) {
+      final key = entry.key;
+      final name = key is String ? key : (key as dynamic).name as String;
+      if (name == 'href' || name == 'xlink:href') return entry.value;
+    }
+    return null;
+  }
+
   void _walk(dom.Node node, {required bool pre}) {
     if (node is dom.Text) {
       final text = pre ? node.data : node.data.replaceAll(RegExp(r'\s+'), ' ');
@@ -335,7 +347,9 @@ class HtmlBlockExtractor {
 
     final tag = (node.localName ?? '').toLowerCase();
     if (_skipTags.contains(tag)) return;
-    if ((node.attributes['epub:type'] ?? '').contains('pagebreak')) return;
+    final epubType = node.attributes['epub:type'] ?? '';
+    // Số trang in và số chú thích trong câu ("...vàng.1") không đọc/hiện giữa đoạn
+    if (epubType.contains('pagebreak') || epubType.contains('noteref')) return;
     if (node.attributes['hidden'] != null || (node.attributes['style'] ?? '').replaceAll(' ', '').contains('display:none')) {
       return;
     }
@@ -348,11 +362,11 @@ class HtmlBlockExtractor {
         _addImage(node.attributes['src']);
         return;
       case 'image': // ảnh trong <svg>
-        _addImage(node.attributes['xlink:href'] ?? node.attributes['href']);
+        _addImage(_href(node));
         return;
       case 'svg':
         for (final img in node.querySelectorAll('image')) {
-          _addImage(img.attributes['xlink:href'] ?? img.attributes['href']);
+          _addImage(_href(img));
         }
         return;
     }
